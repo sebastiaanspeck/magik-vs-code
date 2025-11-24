@@ -18,6 +18,17 @@
         "configuration": "./magik-language-configuration.json"
       }
     ],
+    "notebooks": [
+      {
+        "type": "magik-notebook",
+        "displayName": "Magik Notebook",
+        "selector": [
+          {
+            "filenamePattern": "*.magik-notebook"
+          }
+        ]
+      }
+    ],
     "commands": [
       {
         "command": "magik-vs-code.startSession",
@@ -35,6 +46,10 @@
         "command": "magik-vs-code.sendSectionToSession",
         "title": "Magik: Send Section To Session",
         "enablement": "false"
+      },
+      {
+        "command": "magik-vs-code.pingSession",
+        "title": "Magik: Ping Session"
       }
     ],
     "configuration": {
