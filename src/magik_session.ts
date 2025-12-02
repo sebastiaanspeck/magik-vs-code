@@ -7,6 +7,8 @@ import { ChildProcessWithoutNullStreams, spawn } from 'child_process'
 
 let magikSessionProcess: ChildProcessWithoutNullStreams
 
+const config = vscode.workspace.getConfiguration('magik-vs-code')
+
 export function pingSession() {
 	magikSessionProcess.stdin.write('write("Pinging...")\r')
 }
@@ -23,17 +25,8 @@ export async function startMagikSession(gisVersionPath: string, gisAliasPath: st
 	magikSessionProcess = spawn(startSessionCommand, {
 		shell: true
 	})
-
-	magikSessionProcess.stdout.on('data', (data: Buffer)=> console.log(data.toString()))
-
-	// const magikSessionTerminal = vscode.window.createTerminal({
-	// 	name: 'Magik Session',
-	// 	iconPath: new vscode.ThemeIcon('wand'),
-	// 	shellPath: runaliasPath,
-	// 	shellArgs: runaliasArgs
-	// })
-	// magikSessionTerminal.show()
-	// setState('MAGIK_SESSION_PROCESS', magikSessionProcess)
+	
+	// magikSessionProcess.stdout.on('data', (data: Buffer)=> console.log(data.toString()))
 }
 
 export function sendSectionToSession(range: vscode.Range) {
@@ -56,27 +49,28 @@ export function sendSectionToSession(range: vscode.Range) {
 
 }
 
-export async function sendToSession(text: string, sanitize?: boolean) {
-	// const magikSessionProcess = getState<ChildProcessWithoutNullStreams>('MAGIK_SESSION_PROCESS')
-	// if(!magikSessionProcess) {
-	// 	vscode.window.showInformationMessage('No active Magik session.')
-	// 	return
-	// }
+export async function sendToSession(text: string, execution?: vscode.NotebookCellExecution): Promise<string>{
+	return new Promise((resolve, reject) => {
+		const tempFilePath = path.join(os.tmpdir(), 'sessionBuffer.magik')
+		fs.writeFileSync(tempFilePath, text, { encoding: 'utf8' })
+		magikSessionProcess.stdin.write(`load_file("${tempFilePath}")\r`)
 	
-	const tempFilePath = path.join(os.tmpdir(), 'sessionBuffer.magik')
-	fs.writeFileSync(tempFilePath, text, { encoding: 'utf8' })
-	magikSessionProcess.stdin.write(`load_file("${tempFilePath}")\r`)
-	magikSessionProcess.stdin.end() // Currently stalls without end(), but closes session
-	console.log(`load_file("${tempFilePath}")\r`)
-
-	let output: string[] = []
-	for await (const chunk of magikSessionProcess.stdout) {
-		output.push(chunk.toString())
-	}
+		let output: string[] = []
 	
-	if(sanitize) {
-		output = output.filter(line => !['Magik> ', `Loading ${tempFilePath}\r\n`, 'True 0 \r\n'].includes(line))
-	}
+		const onStdout = (chunk: Buffer) => {
+			const line = chunk.toString()
+			output.push(line)
+			if(line.startsWith('Magik> ')) {
+				magikSessionProcess.stdout.off('data', onStdout)
 
-	return output.join('')
+				if(config.get('sanitizeSessionOutput') as Boolean) {
+					output = output.filter(line => !['Magik> ', `Loading ${tempFilePath}\r\n`, 'True 0 \r\n'].includes(line))
+				}
+				
+				resolve(output.join(''))
+			}
+		}
+	
+		magikSessionProcess.stdout.on("data", onStdout)
+	})
 }

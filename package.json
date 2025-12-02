@@ -82,6 +82,11 @@
           },
           "default": [],
           "description": "A collection of GIS versions which can be used to start a session."
+        },
+        "magik-vs-code.sanitizeSessionOutput": {
+          "type": "boolean",
+          "default": true,
+          "description": "Controls if the session output displays lines like 'Magik>' and 'True 0'"
         }
       }
     }
