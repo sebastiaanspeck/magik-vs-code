@@ -4,6 +4,7 @@ import path from 'path'
 import os from 'os'
 import { getState, setState } from './state'
 import { ChildProcessWithoutNullStreams, spawn } from 'child_process'
+import { magikNotebookController } from './extension'
 
 let magikSessionProcess: ChildProcessWithoutNullStreams
 
@@ -26,7 +27,12 @@ export async function startMagikSession(gisVersionPath: string, gisAliasPath: st
 		shell: true
 	})
 	
-	// magikSessionProcess.stdout.on('data', (data: Buffer)=> console.log(data.toString()))
+	const magikSessionNotebook = await vscode.workspace.openNotebookDocument(magikNotebookController.notebookType)
+	await vscode.window.showNotebookDocument(magikSessionNotebook)
+	await vscode.commands.executeCommand('notebook.cell.execute', {
+		ranges: [new vscode.NotebookRange(0, 1)],
+		document: magikSessionNotebook.uri
+	})
 }
 
 export function sendSectionToSession(range: vscode.Range) {
@@ -41,36 +47,65 @@ export function sendSectionToSession(range: vscode.Range) {
 
 	const text = editor.document.getText(range)
 	sendToSession(text)
-	// const workspaceFolders = vscode.workspace.workspaceFolders
-	// if (!workspaceFolders || workspaceFolders.length === 0) {
-	// 	vscode.window.showErrorMessage('Unable to find workspace folder.')
-	// 	return
-	// }
-
 }
 
-export async function sendToSession(text: string, execution?: vscode.NotebookCellExecution): Promise<string>{
+export async function sendToSession(text: string, execution?: vscode.NotebookCellExecution): Promise<void>{
 	return new Promise((resolve, reject) => {
 		const tempFilePath = path.join(os.tmpdir(), 'sessionBuffer.magik')
 		fs.writeFileSync(tempFilePath, text, { encoding: 'utf8' })
-		magikSessionProcess.stdin.write(`load_file("${tempFilePath}")\r`)
+		// magikSessionProcess.stdin.write(`load_file("${tempFilePath}")\r`)
+		magikSessionProcess.stdin.write(`${text}\r`)
 	
-		let output: string[] = []
+		const onStdout = async(chunk: Buffer) => {
+			const lines = chunk.toString().split('\r\n')
+			lines.forEach(async line => {
+				await handleSessionLine(line, execution!)
 	
-		const onStdout = (chunk: Buffer) => {
-			const line = chunk.toString()
-			output.push(line)
-			if(line.startsWith('Magik> ')) {
-				magikSessionProcess.stdout.off('data', onStdout)
-
-				if(config.get('sanitizeSessionOutput') as Boolean) {
-					output = output.filter(line => !['Magik> ', `Loading ${tempFilePath}\r\n`, 'True 0 \r\n'].includes(line))
+				if(line.startsWith('Magik>')) {
+					magikSessionAppendOutput('\n', execution!)
+					magikSessionProcess.stdout.off('data', onStdout)
+					resolve()
 				}
-				
-				resolve(output.join(''))
-			}
+			});
 		}
-	
-		magikSessionProcess.stdout.on("data", onStdout)
+
+		magikSessionProcess.stdout.on('data', onStdout)
 	})
+}
+
+async function handleSessionLine(line: string, execution: vscode.NotebookCellExecution) {
+	const trimmed = line.trim()
+	if(
+		trimmed === 'Magik>' ||
+		trimmed === '.' ||
+		trimmed === 'True 0' ||
+		trimmed.startsWith('Loading ') 
+	) {
+		return
+	}
+
+	if (trimmed.startsWith('Global ') && trimmed.endsWith(' does not exist: create it? (Y)')) {
+		const selected = await vscode.window.showQuickPick(['Yes', 'No'], {
+			title: line.replace('(Y)', '')
+		})
+		
+		return magikSessionProcess.stdin.write(`${selected === 'Yes' ? 'y' : 'n'}\r\n`)
+	}
+
+	if (trimmed.startsWith('**** Error')) {
+		line = `\x1b[31;4m${line}\x1b[0m`
+	}
+	const filepathRegex = /\(\s*[^()]+\s*:\s*\d+\s*\)/g
+	line = line.replaceAll(filepathRegex, substring => `\x1b[90m${substring}\x1b[0m`)
+
+	const todoRegex = /todo/ig
+	line = line.replaceAll(todoRegex, substring => `\x1b[31m${substring}\x1b[0m`)
+
+	magikSessionAppendOutput(line, execution)
+}
+
+function magikSessionAppendOutput(line: string, execution: vscode.NotebookCellExecution) {
+	execution.appendOutput([
+		new vscode.NotebookCellOutput([vscode.NotebookCellOutputItem.stdout(line)])
+	])
 }

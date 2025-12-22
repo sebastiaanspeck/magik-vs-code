@@ -42,11 +42,7 @@ class MagikNotebookSerializer implements vscode.NotebookSerializer {
 	): Promise<vscode.NotebookData> {
 		// TODO: Deserialize instead of creating new empty Magik notebook
 		return new vscode.NotebookData([
-			new vscode.NotebookCellData(vscode.NotebookCellKind.Code, [
-				'_block',
-				'\twrite("Hello (Small)world!")',
-				'_endblock'
-			].join('\n'), 'magik')
+			new vscode.NotebookCellData(vscode.NotebookCellKind.Code, [''].join('\n'), 'magik')
 		]);
 	}
 
@@ -59,22 +55,14 @@ class MagikNotebookSerializer implements vscode.NotebookSerializer {
 	}
 }
 
-const magikNotebookController = vscode.notebooks.createNotebookController('magik-notebook-kernel', 'magik-notebook', "Magik Notebook Kernel")
+export const magikNotebookController = vscode.notebooks.createNotebookController('magik-notebook-kernel', 'magik-notebook', "Magik Notebook Kernel")
 magikNotebookController.executeHandler = async (cells: vscode.NotebookCell[], notebook: vscode.NotebookDocument, controller: vscode.NotebookController) => {
 	for(const cell of cells) {
 		const execution = magikNotebookController.createNotebookCellExecution(cell)
 		execution.start(Date.now())
-		
-		const sessionOutput = await sendToSession(cell.document.getText())
 
-		let previousOutput = cell.outputs.length ? cell.outputs[0].items[0].data.toString() : ''
+		await sendToSession(cell.document.getText(), execution)
 
-		execution.replaceOutput([
-			new vscode.NotebookCellOutput(
-				[vscode.NotebookCellOutputItem.text(previousOutput + sessionOutput)]
-			)
-		])
-	
 		execution.end(true, Date.now())
 	}
 }
