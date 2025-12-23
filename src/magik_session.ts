@@ -35,7 +35,7 @@ export async function startMagikSession(gisVersionPath: string, gisAliasPath: st
 	})
 }
 
-export function sendSectionToSession(range: vscode.Range) {
+export async function sendSectionToSession(range: vscode.Range) {
 	if(range === undefined) {
 		return
 	}
@@ -46,16 +46,17 @@ export function sendSectionToSession(range: vscode.Range) {
 	}
 
 	const text = editor.document.getText(range)
-	sendToSession(text)
+	const tempFilePath = path.join(os.tmpdir(), 'sessionBuffer.magik')
+	fs.writeFileSync(tempFilePath, text, { encoding: 'utf8' })
+	await sendToSession(`load_file("${tempFilePath}")`)
+
+	vscode.window.showInformationMessage('Successfully sent to buffer')
 }
 
 export async function sendToSession(text: string, execution?: vscode.NotebookCellExecution): Promise<void>{
 	return new Promise((resolve, reject) => {
-		const tempFilePath = path.join(os.tmpdir(), 'sessionBuffer.magik')
-		fs.writeFileSync(tempFilePath, text, { encoding: 'utf8' })
-		// magikSessionProcess.stdin.write(`load_file("${tempFilePath}")\r`)
 		magikSessionProcess.stdin.write(`${text}\r`)
-	
+
 		const onStdout = async(chunk: Buffer) => {
 			const lines = chunk.toString().split('\r\n')
 			lines.forEach(async line => {
@@ -69,7 +70,12 @@ export async function sendToSession(text: string, execution?: vscode.NotebookCel
 			});
 		}
 
-		magikSessionProcess.stdout.on('data', onStdout)
+		if(!execution) {
+			resolve()
+		}
+		else {
+			magikSessionProcess.stdout.on('data', onStdout)
+		}
 	})
 }
 
@@ -84,17 +90,28 @@ async function handleSessionLine(line: string, execution: vscode.NotebookCellExe
 		return
 	}
 
-	if (trimmed.startsWith('Global ') && trimmed.endsWith(' does not exist: create it? (Y)')) {
+	if(trimmed.startsWith('Global ') && trimmed.endsWith(' does not exist: create it? (Y)')) {
 		const selected = await vscode.window.showQuickPick(['Yes', 'No'], {
-			title: line.replace('(Y)', '')
+			title: trimmed.replace('(Y)', '')
 		})
 		
 		return magikSessionProcess.stdin.write(`${selected === 'Yes' ? 'y' : 'n'}\r\n`)
 	}
 
-	if (trimmed.startsWith('**** Error')) {
+	if(trimmed.startsWith('**** Error')) {
 		line = `\x1b[31;4m${line}\x1b[0m`
 	}
+	
+	if(trimmed.startsWith("---- traceback")) {
+		line = `\x1b[31m${line}\x1b[0m`
+	}
+
+	// Globals
+	line = line.replaceAll(/![a-z0-9_?]*?!/gi, substring => `\x1b[32m${substring}\x1b[0m`)
+
+	// Strings
+	line = line.replaceAll(/\".*?\"/g, substring => `\x1b[33m${substring}\x1b[0m`)
+
 	const filepathRegex = /\(\s*[^()]+\s*:\s*\d+\s*\)/g
 	line = line.replaceAll(filepathRegex, substring => `\x1b[90m${substring}\x1b[0m`)
 
