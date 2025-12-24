@@ -16,10 +16,11 @@ export function pingSession() {
 
 export async function startMagikSession(gisVersionPath: string, gisAliasPath: string, gisAliasName: string, environmentPath?: string) {
 	const runaliasPath = `${gisVersionPath}\\bin\\x86\\runalias.exe`
-	const runaliasArgs = ['-a', `${gisAliasPath}`, `${gisAliasName}`]
+	const runaliasArgs = ['-a', gisAliasPath]
 	if(environmentPath) {
 		runaliasArgs.push('-e', environmentPath)
 	}
+	runaliasArgs.push(gisAliasName)
 
 	const startSessionCommand = `${runaliasPath} ${runaliasArgs.join(' ')}`
 
@@ -50,7 +51,7 @@ export async function sendSectionToSession(range: vscode.Range) {
 	fs.writeFileSync(tempFilePath, text, { encoding: 'utf8' })
 	await sendToSession(`load_file("${tempFilePath}")`)
 
-	vscode.window.showInformationMessage('Successfully sent to buffer')
+	vscode.window.showInformationMessage('Successfully sent to session')
 }
 
 export async function sendToSession(text: string, execution?: vscode.NotebookCellExecution): Promise<void>{
@@ -81,42 +82,38 @@ export async function sendToSession(text: string, execution?: vscode.NotebookCel
 
 async function handleSessionLine(line: string, execution: vscode.NotebookCellExecution) {
 	const trimmed = line.trim()
-	if(
-		trimmed === 'Magik>' ||
-		trimmed === '.' ||
-		trimmed === 'True 0' ||
-		trimmed.startsWith('Loading ') 
-	) {
-		return
-	}
+	
+	if(['Magik>', '.', 'True 0'].includes(trimmed) || trimmed.startsWith('Loading ')) { return }
 
-	if(trimmed.startsWith('Global ') && trimmed.endsWith(' does not exist: create it? (Y)')) {
+	const globalCreationMatch = trimmed.match(REGEX.GLOBAL_CREATION_PROMPT)
+	if(globalCreationMatch) {
 		const selected = await vscode.window.showQuickPick(['Yes', 'No'], {
-			title: trimmed.replace('(Y)', '')
+			title: globalCreationMatch[1]
 		})
 		
 		return magikSessionProcess.stdin.write(`${selected === 'Yes' ? 'y' : 'n'}\r\n`)
 	}
 
-	if(trimmed.startsWith('**** Error')) {
-		line = `\x1b[31;4m${line}\x1b[0m`
-	}
-	
-	if(trimmed.startsWith("---- traceback")) {
-		line = `\x1b[31m${line}\x1b[0m`
-	}
+	line = line.replace(REGEX.ERROR, error => style(error, RED, UNDERLINE))
 
-	// Globals
-	line = line.replaceAll(/![a-z0-9_?]*?!/gi, substring => `\x1b[32m${substring}\x1b[0m`)
+	line = line.replace(REGEX.TRACEBACK, traceback => style(traceback, RED))
 
-	// Strings
-	line = line.replaceAll(/\".*?\"/g, substring => `\x1b[33m${substring}\x1b[0m`)
+	line = line.replaceAll(REGEX.GLOBAL, global => style(global, GREEN))
 
-	const filepathRegex = /\(\s*[^()]+\s*:\s*\d+\s*\)/g
-	line = line.replaceAll(filepathRegex, substring => `\x1b[90m${substring}\x1b[0m`)
+	line = line.replaceAll(REGEX.STRING, string => style(string, YELLOW))
 
-	const todoRegex = /todo/ig
-	line = line.replaceAll(todoRegex, substring => `\x1b[31m${substring}\x1b[0m`)
+	line = line.replace(REGEX.APROPOS, (_, type: string, name: string, className: string) => {		
+		const styledName = name
+			.replace(/^[a-z0-9_?!\[\]]*/gi, name => style(name, YELLOW))
+			.replace(' optional ', style(' optional ', CYAN))
+			.replace(' gather ', style(' gather ', CYAN))
+
+		return `${style(type, type === 'CORRUPT' ? RED : BLUE)} ${styledName} ${style('in', GREY)} ${style(className, GREEN)}`
+	})
+
+	line = line.replaceAll(REGEX.TRACEBACK_PATH, tracebackPath => style(tracebackPath, GREY))
+
+	line = line.replaceAll(REGEX.TODO, todo => style(todo, RED))
 
 	magikSessionAppendOutput(line, execution)
 }
@@ -125,4 +122,27 @@ function magikSessionAppendOutput(line: string, execution: vscode.NotebookCellEx
 	execution.appendOutput([
 		new vscode.NotebookCellOutput([vscode.NotebookCellOutputItem.stdout(line)])
 	])
+}
+
+const UNDERLINE = 4
+const RED = 31
+const GREEN = 32
+const YELLOW = 33
+const BLUE = 34
+const CYAN = 36
+const GREY = 90
+
+const REGEX = {
+	APROPOS: /(method|iter method|class constant|class variable|CORRUPT) ([a-z0-9_?!(), <^\[\]]*?) in ([a-z0-9_]*)/gi,
+	ERROR: /^\*\*\*\* Error.*/g,
+	GLOBAL: /![a-z0-9_?]*?!/gi,
+	GLOBAL_CREATION_PROMPT: /^(Global .* does not exist: create it\?) \(Y\)$/,
+	STRING: /\".*?\"/g,
+	TODO: /todo/gi,
+	TRACEBACK: /^---- Traceback.*/g,
+	TRACEBACK_PATH: /\(\s*[^()]+\s*:\s*\d+\s*\)/g
+}
+
+function style(text: string, ...styleCodes: number[]) {
+	return `\x1b[${styleCodes.join(';')}m${text}\x1b[0m`
 }
