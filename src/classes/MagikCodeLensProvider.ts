@@ -39,6 +39,7 @@ function isSectionStart(line: string) {
     line.startsWith('def_slotted_exemplar(') ||
     (!line.startsWith('#') && line.includes('.define_shared_constant(')) ||
     (!line.startsWith('#') && line.includes('.define_shared_variable(')) ||
+    line.includes('.define_slot_access(') || 
     line.startsWith('_global _constant') ||
     line.startsWith('_constant')
 }

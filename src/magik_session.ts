@@ -2,13 +2,10 @@ import * as vscode from 'vscode'
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
-import { getState, setState } from './state'
 import { ChildProcessWithoutNullStreams, spawn } from 'child_process'
 import { magikNotebookController } from './extension'
 
 let magikSessionProcess: ChildProcessWithoutNullStreams
-
-const config = vscode.workspace.getConfiguration('magik-vs-code')
 
 export function pingSession() {
 	magikSessionProcess.stdin.write('write("Pinging...")\r')
@@ -58,6 +55,10 @@ export async function sendToSession(text: string, execution?: vscode.NotebookCel
 	return new Promise((resolve, reject) => {
 		magikSessionProcess.stdin.write(`${text}\r`)
 
+		if(!execution) {
+			resolve()
+		}
+
 		const onStdout = async(chunk: Buffer) => {
 			const lines = chunk.toString().split('\r\n')
 			lines.forEach(async line => {
@@ -71,18 +72,13 @@ export async function sendToSession(text: string, execution?: vscode.NotebookCel
 			});
 		}
 
-		if(!execution) {
-			resolve()
-		}
-		else {
-			magikSessionProcess.stdout.on('data', onStdout)
-		}
+		magikSessionProcess.stdout.on('data', onStdout)
 	})
 }
 
 async function handleSessionLine(line: string, execution: vscode.NotebookCellExecution) {
 	const trimmed = line.trim()
-	
+
 	if(['Magik>', '.', 'True 0'].includes(trimmed) || trimmed.startsWith('Loading ')) { return }
 
 	const globalCreationMatch = trimmed.match(REGEX.GLOBAL_CREATION_PROMPT)
@@ -94,15 +90,15 @@ async function handleSessionLine(line: string, execution: vscode.NotebookCellExe
 		return magikSessionProcess.stdin.write(`${selected === 'Yes' ? 'y' : 'n'}\r\n`)
 	}
 
-	line = line.replace(REGEX.ERROR, error => style(error, RED, UNDERLINE))
+	line = line.replaceAll(REGEX.ERROR, error => style(error, RED, UNDERLINE))
 
-	line = line.replace(REGEX.TRACEBACK, traceback => style(traceback, RED))
+	line = line.replaceAll(REGEX.TRACEBACK, traceback => style(traceback, RED))
 
 	line = line.replaceAll(REGEX.GLOBAL, global => style(global, GREEN))
 
 	line = line.replaceAll(REGEX.STRING, string => style(string, YELLOW))
 
-	line = line.replace(REGEX.APROPOS, (_, type: string, name: string, className: string) => {		
+	line = line.replaceAll(REGEX.APROPOS, (_, type: string, name: string, className: string) => {		
 		const styledName = name
 			.replace(/^[a-z0-9_?!\[\]]*/gi, name => style(name, YELLOW))
 			.replace(' optional ', style(' optional ', CYAN))
@@ -134,15 +130,15 @@ const GREY = 90
 
 const REGEX = {
 	APROPOS: /(method|iter method|class constant|class variable|CORRUPT) ([a-z0-9_?!(), <^\[\]]*?) in ([a-z0-9_]*)/gi,
-	ERROR: /^\*\*\*\* Error.*/g,
+	ERROR: /^\*\*\*\* error.*/gi,
 	GLOBAL: /![a-z0-9_?]*?!/gi,
 	GLOBAL_CREATION_PROMPT: /^(Global .* does not exist: create it\?) \(Y\)$/,
 	STRING: /\".*?\"/g,
 	TODO: /todo/gi,
-	TRACEBACK: /^---- Traceback.*/g,
+	TRACEBACK: /^---- traceback.*/gi,
 	TRACEBACK_PATH: /\(\s*[^()]+\s*:\s*\d+\s*\)/g
 }
 
 function style(text: string, ...styleCodes: number[]) {
-	return `\x1b[${styleCodes.join(';')}m${text}\x1b[0m`
+	return `\x1b[0m\x1b[${styleCodes.join(';')}m${text}\x1b[0m`
 }
