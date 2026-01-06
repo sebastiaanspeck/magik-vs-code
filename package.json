@@ -35,6 +35,10 @@
         "title": "Magik: Start Session"
       },
       {
+        "command": "magik-vs-code.killSession",
+        "title": "Magik: Kill Session"
+      },
+      {
         "command": "magik-vs-code.selectLayeredProduct",
         "title": "Magik: Select Layered Product"
       },
@@ -48,8 +52,35 @@
         "enablement": "false"
       },
       {
-        "command": "magik-vs-code.pingSession",
-        "title": "Magik: Ping Session"
+        "command": "magik-vs-code.sendSectionAtCurrentPositionToSession",
+        "title": "Magik: Send Section at Current Position to Session"
+      },
+      {
+        "command": "magik-vs-code.sendFileToSession",
+        "title": "Magik: Send File to Session"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "magik-vs-code.startSession",
+        "key": "f2 s"
+      },
+      {
+        "command": "magik-vs-code.killSession",
+        "key": "ctrl+c ctrl+c"
+      },
+      {
+        "command": "magik-vs-code.sendSectionAtCurrentPositionToSession",
+        "key": "f2 enter"
+      },
+      {
+        "command": "magik-vs-code.sendFileToSession",
+        "key": "f2 b"
+      },
+      {
+        "key": "f8",
+        "command": "notebook.cell.execute",
+        "when": "notebookCellListFocused && notebookMissingKernelExtension && !notebookCellExecuting && notebookCellType == 'code' || notebookCellListFocused && !notebookCellExecuting && notebookCellType == 'code' && notebookKernelCount > 0 || notebookCellListFocused && !notebookCellExecuting && notebookCellType == 'code' && notebookKernelSourceCount > 0"
       }
     ],
     "configuration": {
@@ -82,11 +113,6 @@
           },
           "default": [],
           "description": "A collection of GIS versions which can be used to start a session."
-        },
-        "magik-vs-code.enableCodeLenses": {
-          "type": "boolean",
-          "default": true,
-          "description": "Toggles showing actions like 'Send to Session' in Magik files when a session is active."
         }
       }
     }

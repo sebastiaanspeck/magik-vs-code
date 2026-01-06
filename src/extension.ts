@@ -52,7 +52,6 @@ class MagikNotebookSerializer implements vscode.NotebookSerializer {
 export const magikNotebookController = vscode.notebooks.createNotebookController('magik-notebook-kernel', 'magik-notebook', "Magik Notebook Kernel")
 magikNotebookController.executeHandler = async (cells: vscode.NotebookCell[], notebook: vscode.NotebookDocument, controller: vscode.NotebookController) => {
 	for(const cell of cells) {
-		
 		await magikSession.send(cell.document.getText(), cell)
 		
 		if (cell.index === notebook.cellCount - 1) {

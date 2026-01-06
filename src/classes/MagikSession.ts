@@ -1,5 +1,5 @@
 import { ChildProcessWithoutNullStreams, spawn } from 'child_process'
-import { config, magikNotebookController } from '../extension'
+import { magikNotebookController, setMagikSession } from '../extension'
 import * as vscode from 'vscode'
 import fs from 'fs'
 import path from 'path'
@@ -17,18 +17,23 @@ export class MagikSession {
     process!: ChildProcessWithoutNullStreams
     notebook!: vscode.NotebookDocument
     lastExecutedCell: vscode.NotebookCell | undefined
+    codeLensProvider!: MagikCodeLensProvider
 
     constructor(gisVersionPath: string, gisAliasPath: string, gisAliasName: string, environmentPath?: string) {
         this.gisVersionPath = gisVersionPath
         this.gisAliasPath = gisAliasPath
         this.gisAliasName = gisAliasName
         this.environmentPath = environmentPath
-        this.startSession()
+        this.start()
         this.openNotebook()
         this.enableCommands()
     } 
 
-    private startSession() {
+    isActive() {
+        return !this.process.killed
+    }
+
+    private start() {
         const runaliasPath = `${this.gisVersionPath}\\bin\\x86\\runalias.exe`
         const runaliasArgs = ['-a', this.gisAliasPath]
         if(this.environmentPath) {
@@ -42,6 +47,20 @@ export class MagikSession {
         })
     }
 
+    async kill() {
+        if(!this.isActive()) {
+            return vscode.window.showInformationMessage('Session has already been killed.')
+        }
+
+        const shouldKillProcess = await vscode.window.showQuickPick(['Yes', 'No'], {
+            title: 'Kill the Magik process?'
+        })
+
+        if(shouldKillProcess === 'Yes') {
+            this.process.kill()
+        }
+    }
+
     private async openNotebook() {
         this.notebook = await vscode.workspace.openNotebookDocument(magikNotebookController.notebookType)
         await vscode.window.showNotebookDocument(this.notebook)
@@ -52,20 +71,37 @@ export class MagikSession {
     }
 
     private enableCommands() {
+        this.codeLensProvider = new MagikCodeLensProvider()
         const context = getContext()
         context.subscriptions.push(
+            vscode.commands.registerCommand('magik-vs-code.killSession', this.kill, this),
             vscode.commands.registerCommand('magik-vs-code.sendSectionToSession', this.sendSection, this),
+            vscode.commands.registerTextEditorCommand('magik-vs-code.sendSectionAtCurrentPositionToSession', this.sendSectionAtCurrentPosition, this),
+            vscode.commands.registerCommand('magik-vs-code.sendFileToSession', this.sendSection, this),
             vscode.commands.registerCommand('magik-vs-code.removeExemplar', this.removeExemplar, this),
+            vscode.languages.registerCodeLensProvider({
+                scheme: 'file',
+                language: 'magik'
+            }, this.codeLensProvider)
         )
+    }
 
-        if(config.get<Boolean>('enableCodeLenses')) {
-            context.subscriptions.push(
-                vscode.languages.registerCodeLensProvider({
-                    scheme: 'file',
-                    language: 'magik'
-                }, new MagikCodeLensProvider())
-            )
+    async sendSectionAtCurrentPosition(editor: vscode.TextEditor) {
+        const index = editor.selection.active.line
+        const codeLens = this.codeLensProvider.codeLenses.find(codeLens => {
+            return codeLens.range.contains(new vscode.Position(index, 0))
+        })
+
+        if(!codeLens) {
+            return vscode.window.showWarningMessage('Not within range of item to send.')
         }
+
+        await vscode.commands.executeCommand('magik-vs-code.sendSectionToSession', ...codeLens.command!.arguments ?? [])
+
+        // DEBUG: Highlight code lens range
+        // editor.setDecorations(vscode.window.createTextEditorDecorationType({
+        //     backgroundColor: '#ee3355ff'
+        // }), [codeLens.range])
     }
 
     async sendSection(range: vscode.Range) {
@@ -86,8 +122,13 @@ export class MagikSession {
 
     async send(text: string, cell?: vscode.NotebookCell): Promise<void> {
         return new Promise((resolve, reject) => {
-            this.lastExecutedCell = cell ?? this.lastExecutedCell
-            const execution = magikNotebookController.createNotebookCellExecution(cell ?? this.lastExecutedCell!)
+            if(!this.isActive()) {
+                vscode.window.showErrorMessage('Session no longer active.')
+                return reject()
+            }
+
+            cell = cell ?? this.lastExecutedCell!
+            const execution = magikNotebookController.createNotebookCellExecution(cell)
             execution.start(Date.now())
 
             this.process.stdin.write(`${text}\r`)
@@ -110,18 +151,18 @@ export class MagikSession {
         })
     }
 
-    async processLine(line: string, execution: vscode.NotebookCellExecution) {
+    private async processLine(line: string, execution: vscode.NotebookCellExecution) {
         const trimmed = line.trim()
     
         if(['Magik>', '.', 'True 0'].includes(trimmed) || trimmed.startsWith('Loading ')) { return }
     
         const globalCreationMatch = trimmed.match(Regex.GlobalCreationPrompt)
         if(globalCreationMatch) {
-            const selected = await vscode.window.showQuickPick(['Yes', 'No'], {
+            const shouldCreateGlobal = await vscode.window.showQuickPick(['Yes', 'No'], {
                 title: globalCreationMatch[1]
             })
             
-            return this.process.stdin.write(`${selected === 'Yes' ? 'y' : 'n'}\r\n`)
+            return this.process.stdin.write(`${shouldCreateGlobal === 'Yes' ? 'y' : 'n'}\r\n`)
         }
     
         line = line.replaceAll(Regex.Error, error => applyStyle(error, Style.White, Style.RedBackground))
