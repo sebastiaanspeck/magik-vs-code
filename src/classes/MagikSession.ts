@@ -1,5 +1,5 @@
 import { ChildProcessWithoutNullStreams, spawn } from 'child_process'
-import { magikNotebookController } from '../extension'
+import { config, magikNotebookController } from '../extension'
 import * as vscode from 'vscode'
 import fs from 'fs'
 import path from 'path'
@@ -55,18 +55,20 @@ export class MagikSession {
         const context = getContext()
         context.subscriptions.push(
             vscode.commands.registerCommand('magik-vs-code.sendSectionToSession', this.sendSection, this),
-            vscode.languages.registerCodeLensProvider({
-                scheme: 'file',
-                language: 'magik'
-            }, new MagikCodeLensProvider()
-        ))
+            vscode.commands.registerCommand('magik-vs-code.removeExemplar', this.removeExemplar, this),
+        )
+
+        if(config.get<Boolean>('enableCodeLenses')) {
+            context.subscriptions.push(
+                vscode.languages.registerCodeLensProvider({
+                    scheme: 'file',
+                    language: 'magik'
+                }, new MagikCodeLensProvider())
+            )
+        }
     }
 
     async sendSection(range: vscode.Range) {
-        if(range === undefined) {
-            return
-        }
-        
         const editor = vscode.window.activeTextEditor
         if(!editor) {
             return 
@@ -76,8 +78,10 @@ export class MagikSession {
         const tempFilePath = path.join(os.tmpdir(), 'sessionBuffer.magik')
         fs.writeFileSync(tempFilePath, text, { encoding: 'utf8' })
         await this.send(`load_file("${tempFilePath}")`)
-    
-        vscode.window.showInformationMessage('Successfully sent to session')
+    }
+
+    async removeExemplar(exemplarName: string) {
+        await this.send(`remex(${exemplarName})`)
     }
 
     async send(text: string, cell?: vscode.NotebookCell): Promise<void> {
@@ -120,17 +124,19 @@ export class MagikSession {
             return this.process.stdin.write(`${selected === 'Yes' ? 'y' : 'n'}\r\n`)
         }
     
-        line = line.replaceAll(Regex.Error, error => applyStyle(error, Style.Red, Style.Underline))
+        line = line.replaceAll(Regex.Error, error => applyStyle(error, Style.White, Style.RedBackground))
 
         line = line.replaceAll(Regex.Traceback, traceback => applyStyle(traceback, Style.Red))
-    
+        
+        line = line.replaceAll(Regex.Warning, warning => applyStyle(warning, Style.Black, Style.YellowBackground))
+
         line = line.replaceAll(Regex.Global, global => applyStyle(global, Style.Green))
     
         line = line.replaceAll(Regex.String, string => applyStyle(string, Style.Yellow))
     
         line = line.replaceAll(Regex.Apropos, (_, type: string, name: string, className: string) => {		
             const styledName = name
-                .replace(/^[a-z0-9_?!\[\]]*/gi, name => applyStyle(name, Style.Yellow))
+                .replace(/^[\w?!\[\]]*/g, name => applyStyle(name, Style.Yellow))
                 .replace(' optional ', applyStyle(' optional ', Style.Cyan))
                 .replace(' gather ', applyStyle(' gather ', Style.Cyan))
     

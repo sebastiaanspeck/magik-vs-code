@@ -7,12 +7,10 @@ import { MagikSession } from '../classes/MagikSession'
 import { GisVersion } from '../interfaces/GisVersion'
 import { LayeredProduct } from '../interfaces/LayeredProduct'
 import { GisAlias } from '../interfaces/GisAlias'
-import { setMagikSession } from '../extension'
-
-const config = vscode.workspace.getConfiguration('magik-vs-code')
+import { config, setMagikSession } from '../extension'
 
 export function showGisVersionPicker() {
-	const gisVersions = config.get('gisVersions') as GisVersion[]
+	const gisVersions = config.get<GisVersion[]>('gisVersions') ?? []
 	
 	if(gisVersions.length === 0) {
 		vscode.window.showWarningMessage('No GIS versions found', 'Open Settings').then(selection => {

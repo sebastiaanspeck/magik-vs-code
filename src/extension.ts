@@ -1,8 +1,9 @@
 import * as vscode from 'vscode'
-
 import { setContext } from './utils/state'
-import { showGisAliasPicker, showGisVersionPicker, showLayeredProductPicker } from './ui/user_interface'
+import { showGisAliasPicker, showGisVersionPicker, showLayeredProductPicker } from './ui/sessionUI'
 import { MagikSession } from './classes/MagikSession'
+
+export const config = vscode.workspace.getConfiguration('magik-vs-code')
 
 export let magikSession: MagikSession
 export function setMagikSession(session: MagikSession) {

@@ -1,8 +1,17 @@
 import * as vscode from 'vscode'
+import { Regex } from '../enums/Regex'
 
 export class MagikCodeLensProvider implements vscode.CodeLensProvider {
     provideCodeLenses(document: vscode.TextDocument): vscode.CodeLens[] {
         const codeLenses: vscode.CodeLens[] = []
+
+        codeLenses.push(
+            new vscode.CodeLens(new vscode.Range(0,0,0,0), {
+                title: 'Send File to Session',
+                tooltip: 'Send entire file to the Magik session',
+                command: 'magik-vs-code.sendSectionToSession'
+            })
+        )
 
         const lines = document.getText().split('\n')
         lines.forEach((line, index) => {
@@ -21,12 +30,25 @@ export class MagikCodeLensProvider implements vscode.CodeLensProvider {
 
             codeLenses.push(
                 new vscode.CodeLens(new vscode.Range(startIndex, 0, startIndex, line.length), {
-                        title: 'Send to session',
+                        title: 'Send to Session',
                         tooltip: 'Send this section to the Magik session',
                         command: 'magik-vs-code.sendSectionToSession',
                         arguments: [range]
                     })
             )
+
+            const defSlottedExemplarMatch = line.match(Regex.DefSlottedExemplar)
+            if(defSlottedExemplarMatch) {
+                const exemplarName = defSlottedExemplarMatch[1]
+                codeLenses.push(
+                    new vscode.CodeLens(new vscode.Range(startIndex, 0, startIndex, line.length), {
+                        title: 'Remove Exemplar',
+                        tooltip: `Remove exemplar from session, shortcut for remex(${exemplarName})`,
+                        command: 'magik-vs-code.removeExemplar',
+                        arguments: [exemplarName]
+                    })
+                )
+            }
         })
 
         return codeLenses
@@ -34,12 +56,12 @@ export class MagikCodeLensProvider implements vscode.CodeLensProvider {
 }
 
 function isSectionStart(line: string) {
-    return line.startsWith('_method') ||
-    line.startsWith('_private _method') ||
-    line.startsWith('def_slotted_exemplar(') ||
-    (!line.startsWith('#') && line.includes('.define_shared_constant(')) ||
-    (!line.startsWith('#') && line.includes('.define_shared_variable(')) ||
-    line.includes('.define_slot_access(') || 
-    line.startsWith('_global _constant') ||
-    line.startsWith('_constant')
+    return [
+        Regex.DefSlottedExemplar,
+        Regex.DefineSlotAccess,
+        Regex.Method,
+        Regex.Constant,
+        Regex.DefineSharedConstant,
+        Regex.DefineSharedVariable
+    ].some(regex => line.match(regex))
 }
