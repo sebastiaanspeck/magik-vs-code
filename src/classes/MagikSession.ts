@@ -127,8 +127,8 @@ export class MagikSession {
                 return reject()
             }
 
-            cell = cell ?? this.lastExecutedCell!
-            const execution = magikNotebookController.createNotebookCellExecution(cell)
+            this.lastExecutedCell = cell ?? this.lastExecutedCell!
+            const execution = magikNotebookController.createNotebookCellExecution(this.lastExecutedCell)
             execution.start(Date.now())
 
             this.process.stdin.write(`${text}\r`)
