@@ -62,25 +62,19 @@
     ],
     "keybindings": [
       {
-        "command": "magik-vs-code.startSession",
-        "key": "f2 s"
-      },
-      {
-        "command": "magik-vs-code.killSession",
-        "key": "ctrl+c ctrl+c"
-      },
-      {
         "command": "magik-vs-code.sendSectionAtCurrentPositionToSession",
-        "key": "f2 enter"
+        "key": "f2 enter",
+        "when": "resourceLangId == magik"
       },
       {
         "command": "magik-vs-code.sendFileToSession",
-        "key": "f2 b"
+        "key": "f2 b",
+        "when": "resourceLangId == magik"
       },
       {
         "key": "f8",
         "command": "notebook.cell.execute",
-        "when": "notebookCellListFocused && notebookMissingKernelExtension && !notebookCellExecuting && notebookCellType == 'code' || notebookCellListFocused && !notebookCellExecuting && notebookCellType == 'code' && notebookKernelCount > 0 || notebookCellListFocused && !notebookCellExecuting && notebookCellType == 'code' && notebookKernelSourceCount > 0"
+        "when": "notebookCellListFocused && notebookMissingKernelExtension && !notebookCellExecuting && notebookCellType == 'code' && notebookType == magik-notebook || notebookCellListFocused && !notebookCellExecuting && notebookCellType == 'code' && notebookKernelCount > 0 && notebookType == magik-notebook || notebookCellListFocused && !notebookCellExecuting && notebookCellType == 'code' && notebookKernelSourceCount > 0 && notebookType == magik-notebook"
       }
     ],
     "configuration": {

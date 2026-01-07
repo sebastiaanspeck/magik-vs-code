@@ -139,7 +139,7 @@ export class MagikSession {
                     await this.processLine(line, execution)
         
                     if(line.startsWith('Magik>')) {
-                        this.appendToNotebook('\n', execution)
+                        this.appendOutput('\n', execution)
                         this.process.stdout.off('data', onSessionOutput)
                         execution.end(true, Date.now())
                         resolve()
@@ -154,7 +154,9 @@ export class MagikSession {
     private async processLine(line: string, execution: vscode.NotebookCellExecution) {
         const trimmed = line.trim()
     
-        if(['Magik>', '.', 'True 0'].includes(trimmed) || trimmed.startsWith('Loading ')) { return }
+        if(['Magik>', '.', 'True 0'].includes(trimmed) || trimmed.startsWith('Loading ')) { 
+            return
+        }
     
         const globalCreationMatch = trimmed.match(Regex.GlobalCreationPrompt)
         if(globalCreationMatch) {
@@ -188,10 +190,10 @@ export class MagikSession {
     
         line = line.replaceAll(Regex.Todo, todo => applyStyle(todo, Style.Red))
     
-        this.appendToNotebook(line, execution)
+        this.appendOutput(line, execution)
     }
 
-    private appendToNotebook(line: string, execution: vscode.NotebookCellExecution) {
+    private appendOutput(line: string, execution: vscode.NotebookCellExecution) {
         execution.appendOutput([
             new vscode.NotebookCellOutput([vscode.NotebookCellOutputItem.stdout(line)])
         ])
