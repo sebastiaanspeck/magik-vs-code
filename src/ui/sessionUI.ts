@@ -1,15 +1,16 @@
 import * as vscode from 'vscode'
 import * as fs from 'fs'
-import { GisAlias, GisVersion, LayeredProduct } from './interfaces'
-import { GenericQuickPickItem } from './classes/GenericQuickPickItem'
-import { getState, setState } from './state'
-import { parseGisAliases, parseLayeredProducts } from './parsers'
-import { startMagikSession } from './magik_session'
-
-const config = vscode.workspace.getConfiguration('magik-vs-code')
+import { GenericQuickPickItem } from '../classes/GenericQuickPickItem'
+import { getState, setState } from '../utils/state'
+import { parseGisAliases, parseLayeredProducts } from '../utils/parsers'
+import { MagikSession } from '../classes/MagikSession'
+import { GisVersion } from '../interfaces/GisVersion'
+import { LayeredProduct } from '../interfaces/LayeredProduct'
+import { GisAlias } from '../interfaces/GisAlias'
+import { config, setMagikSession } from '../extension'
 
 export function showGisVersionPicker() {
-	const gisVersions = config.get('gisVersions') as GisVersion[]
+	const gisVersions = config.get<GisVersion[]>('gisVersions') ?? []
 	
 	if(gisVersions.length === 0) {
 		vscode.window.showWarningMessage('No GIS versions found', 'Open Settings').then(selection => {
@@ -90,6 +91,7 @@ export async function showLayeredProductPicker() {
 		setState('LAYERED_PRODUCT', layeredProduct)
 		showGisAliasPicker()
 	})
+	
 	layeredProductPicker.onDidHide(() => {
 		layeredProductPicker.dispose()
 	})
@@ -118,7 +120,6 @@ export function showGisAliasPicker() {
 		return
 	}
 
-
 	const gisAliases = parseGisAliases(layeredProduct, gisVersion)
 	
 	const gisAliasPicker = vscode.window.createQuickPick<GenericQuickPickItem<GisAlias>>()
@@ -135,13 +136,15 @@ export function showGisAliasPicker() {
 		const selectedGisAlias = selectedQuickPickItems[0].data
 		const environmentPath = `${layeredProduct.path}\\config\\environment.bat`
 		const gisAliasPath = `${layeredProduct.path}\\config\\gis_aliases`
+		
 		if(fs.existsSync(environmentPath)) {
-			startMagikSession(gisVersion.path, gisAliasPath, selectedGisAlias.name, environmentPath)
+			setMagikSession(new MagikSession(gisVersion.path, gisAliasPath, selectedGisAlias.name, environmentPath))
 		}
 		else {
-			startMagikSession(gisVersion.path, gisAliasPath, selectedGisAlias.name)
+			setMagikSession(new MagikSession(gisVersion.path, gisAliasPath, selectedGisAlias.name))
 		}
 	})
+
 	gisAliasPicker.onDidHide(() => {
 		gisAliasPicker.dispose()
 	})

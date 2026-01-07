@@ -18,10 +18,25 @@
         "configuration": "./magik-language-configuration.json"
       }
     ],
+    "notebooks": [
+      {
+        "type": "magik-notebook",
+        "displayName": "Magik Notebook",
+        "selector": [
+          {
+            "filenamePattern": "*.magik-notebook"
+          }
+        ]
+      }
+    ],
     "commands": [
       {
         "command": "magik-vs-code.startSession",
         "title": "Magik: Start Session"
+      },
+      {
+        "command": "magik-vs-code.killSession",
+        "title": "Magik: Kill Session"
       },
       {
         "command": "magik-vs-code.selectLayeredProduct",
@@ -35,6 +50,31 @@
         "command": "magik-vs-code.sendSectionToSession",
         "title": "Magik: Send Section To Session",
         "enablement": "false"
+      },
+      {
+        "command": "magik-vs-code.sendSectionAtCurrentPositionToSession",
+        "title": "Magik: Send Section at Current Position to Session"
+      },
+      {
+        "command": "magik-vs-code.sendFileToSession",
+        "title": "Magik: Send File to Session"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "magik-vs-code.sendSectionAtCurrentPositionToSession",
+        "key": "f2 enter",
+        "when": "resourceLangId == magik"
+      },
+      {
+        "command": "magik-vs-code.sendFileToSession",
+        "key": "f2 b",
+        "when": "resourceLangId == magik"
+      },
+      {
+        "key": "f8",
+        "command": "notebook.cell.execute",
+        "when": "notebookCellListFocused && notebookMissingKernelExtension && !notebookCellExecuting && notebookCellType == 'code' && notebookType == magik-notebook || notebookCellListFocused && !notebookCellExecuting && notebookCellType == 'code' && notebookKernelCount > 0 && notebookType == magik-notebook || notebookCellListFocused && !notebookCellExecuting && notebookCellType == 'code' && notebookKernelSourceCount > 0 && notebookType == magik-notebook"
       }
     ],
     "configuration": {

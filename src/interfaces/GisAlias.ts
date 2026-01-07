@@ -1,15 +1,3 @@
-export interface GisVersion {
-    name: string
-    version?: string
-    path: string
-}
-
-export interface LayeredProduct {
-    name: string
-    path: string
-    version?: string
-}
-
 export interface GisAlias {
     name: string
     title: string
