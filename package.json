@@ -14,7 +14,9 @@
     "languages": [
       {
         "id": "magik",
-        "extensions": [".magik"],
+        "extensions": [
+          ".magik"
+        ],
         "configuration": "./magik-language-configuration.json"
       }
     ],
@@ -29,6 +31,15 @@
         ]
       }
     ],
+    "views": {
+      "explorer": [
+        {
+          "type": "webview",
+          "id": "magik-vs-code.classBrowser",
+          "name": "Magik Class Browser"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "magik-vs-code.startSession",
@@ -58,6 +69,14 @@
       {
         "command": "magik-vs-code.sendFileToSession",
         "title": "Magik: Send File to Session"
+      },
+      {
+        "command": "magik-vs-code.showClassBrowser",
+        "title": "Magik: Show Class Browser"
+      },
+      {
+        "command": "magik-vs-code.searchClassBrowser",
+        "title": "Magik: Search in Class Browser"
       }
     ],
     "keybindings": [
@@ -72,9 +91,23 @@
         "when": "resourceLangId == magik"
       },
       {
+        "key": "f2 p",
+        "command": "notebook.focusPreviousEditor",
+        "when": "config.notebook.navigation.allowNavigateToSurroundingCells && editorTextFocus && inputFocus && notebookEditorFocused && !accessibilityModeEnabled && !isEmbeddedDiffEditor"
+      },
+      {
+        "key": "f2 n",
+        "command": "notebook.focusNextEditor",
+        "when": "config.notebook.navigation.allowNavigateToSurroundingCells && editorTextFocus && inputFocus && notebookEditorFocused && !accessibilityModeEnabled && !isEmbeddedDiffEditor"
+      },
+      {
         "key": "f8",
         "command": "notebook.cell.execute",
         "when": "notebookCellListFocused && notebookMissingKernelExtension && !notebookCellExecuting && notebookCellType == 'code' && notebookType == magik-notebook || notebookCellListFocused && !notebookCellExecuting && notebookCellType == 'code' && notebookKernelCount > 0 && notebookType == magik-notebook || notebookCellListFocused && !notebookCellExecuting && notebookCellType == 'code' && notebookKernelSourceCount > 0 && notebookType == magik-notebook"
+      },
+      {
+        "key": "f3 f3",
+        "command": "magik-vs-code.showClassBrowser"
       }
     ],
     "configuration": {
@@ -135,5 +168,8 @@
     "typescript": "^5.9.2",
     "webpack": "^5.101.0",
     "webpack-cli": "^6.0.1"
+  },
+  "dependencies": {
+    "@vscode/codicons": "^0.0.44"
   }
 }

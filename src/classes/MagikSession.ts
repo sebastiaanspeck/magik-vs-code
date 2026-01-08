@@ -8,16 +8,18 @@ import { Style } from '../enums/Style'
 import { Regex } from '../enums/Regex'
 import { getContext } from '../utils/state'
 import { MagikCodeLensProvider } from './MagikCodeLensProvider'
+import { MagikClassBrowser } from './MagikClassBrowser'
 
 export class MagikSession {
     gisVersionPath: string
     gisAliasPath: string
     gisAliasName: string
-    environmentPath: string | undefined
+    environmentPath?: string
     process!: ChildProcessWithoutNullStreams
     notebook!: vscode.NotebookDocument
-    lastExecutedCell: vscode.NotebookCell | undefined
+    lastExecutedCell?: vscode.NotebookCell
     codeLensProvider!: MagikCodeLensProvider
+    classBrowser: MagikClassBrowser
 
     constructor(gisVersionPath: string, gisAliasPath: string, gisAliasName: string, environmentPath?: string) {
         this.gisVersionPath = gisVersionPath
@@ -27,6 +29,7 @@ export class MagikSession {
         this.start()
         this.openNotebook()
         this.enableCommands()
+        this.classBrowser = new MagikClassBrowser()
     } 
 
     isActive() {
