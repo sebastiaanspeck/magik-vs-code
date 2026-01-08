@@ -95,6 +95,13 @@
       case 'enableSearch':
         enableSearch(message.enabled);
         break;
+      case 'result':
+        const methodElement = document.createElement('li')
+        const span = document.createElement('span')
+        span.appendChild(document.createTextNode(message.line))
+        methodElement.appendChild(span)
+        resultsList.appendChild(methodElement)
+        break
       case 'focus':
         if (classInput.classList.contains('disabled')) {
           break

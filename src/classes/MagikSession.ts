@@ -19,7 +19,7 @@ export class MagikSession {
     notebook!: vscode.NotebookDocument
     lastExecutedCell?: vscode.NotebookCell
     codeLensProvider!: MagikCodeLensProvider
-    classBrowser: MagikClassBrowser
+    classBrowser?: MagikClassBrowser
 
     constructor(gisVersionPath: string, gisAliasPath: string, gisAliasName: string, environmentPath?: string) {
         this.gisVersionPath = gisVersionPath
@@ -29,7 +29,6 @@ export class MagikSession {
         this.start()
         this.openNotebook()
         this.enableCommands()
-        this.classBrowser = new MagikClassBrowser()
     } 
 
     isActive() {
@@ -82,6 +81,7 @@ export class MagikSession {
             vscode.commands.registerTextEditorCommand('magik-vs-code.sendSectionAtCurrentPositionToSession', this.sendSectionAtCurrentPosition, this),
             vscode.commands.registerCommand('magik-vs-code.sendFileToSession', this.sendSection, this),
             vscode.commands.registerCommand('magik-vs-code.removeExemplar', this.removeExemplar, this),
+            vscode.commands.registerCommand('magik-vs-code.showClassBrowser', this.showClassBrowser, this),
             vscode.languages.registerCodeLensProvider({
                 scheme: 'file',
                 language: 'magik'
@@ -123,7 +123,16 @@ export class MagikSession {
         await this.send(`remex(${exemplarName})`)
     }
 
-    async send(text: string, cell?: vscode.NotebookCell): Promise<void> {
+    async showClassBrowser() {
+        if(!this.classBrowser) {
+            await this.send('method_finder.start_acp()')
+            const processID = await this.send('system.process_id')
+            this.classBrowser = new MagikClassBrowser(Number(processID))
+        }
+        this.classBrowser.show()
+    }
+
+    async send(text: string, cell?: vscode.NotebookCell): Promise<string> {
         return new Promise((resolve, reject) => {
             if(!this.isActive()) {
                 vscode.window.showErrorMessage('Session no longer active.')
@@ -135,8 +144,9 @@ export class MagikSession {
             execution.start(Date.now())
 
             this.process.stdin.write(`${text}\r`)
-
+            
             const onSessionOutput = async(chunk: Buffer) => {
+                let previousLine = ''
                 const lines = chunk.toString().split('\r\n')
                 lines.forEach(async line => {
                     await this.processLine(line, execution)
@@ -145,7 +155,11 @@ export class MagikSession {
                         this.appendOutput('\n', execution)
                         this.process.stdout.off('data', onSessionOutput)
                         execution.end(true, Date.now())
-                        resolve()
+                        resolve(previousLine)
+                    }
+
+                    if(line.trim() !== '') {
+                        previousLine = line
                     }
                 });
             }

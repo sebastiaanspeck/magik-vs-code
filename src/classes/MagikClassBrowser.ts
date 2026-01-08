@@ -1,7 +1,13 @@
 import * as vscode from 'vscode'
 import { getContext } from '../utils/state'
+import { createInterface } from 'readline'
+import { ChildProcessWithoutNullStreams, spawn } from 'child_process'
+import { magikSession } from '../extension'
+import path from 'path'
 
 export class MagikClassBrowser implements vscode.WebviewViewProvider {
+    processID: number
+    process?: ChildProcessWithoutNullStreams
     context: vscode.ExtensionContext
     view?: vscode.WebviewView
     searchParameters = {
@@ -12,7 +18,8 @@ export class MagikClassBrowser implements vscode.WebviewViewProvider {
         comments: false
     }
 
-    constructor() {
+    constructor(processID: number) {
+        this.processID = processID
         this.context = getContext()
         this.enableCommands()   
     }
@@ -20,9 +27,41 @@ export class MagikClassBrowser implements vscode.WebviewViewProvider {
     private enableCommands() {
         this.context.subscriptions.push(
             vscode.window.registerWebviewViewProvider('magik-vs-code.classBrowser', this),
-            vscode.commands.registerCommand('magik-vs-code.showClassBrowser', this.show, this),
             vscode.commands.registerCommand('magik-vs-code.searchClassBrowser', this.search, this)
         )
+    }
+
+    async start() {
+        console.log('PID', this.processID)
+        const methodFinderPath = path.join(magikSession.gisVersionPath, 'etc', 'x86', 'mf_connector.exe')
+        const startCommand = `${methodFinderPath} -m //./pipe/method_finder/${this.processID}`
+        this.process = spawn(startCommand, {
+            shell: true
+        })
+
+        const lineReader = createInterface({
+            input: this.process.stdout,
+            output: this.process.stdin
+        })
+
+        lineReader.on('line', (line) => {
+            if(line.includes('')) {
+                // TODO: these seem to be topics, maybe do something with them
+                return
+            }
+
+            if(line.includes(' *** ')){
+                this.view?.webview.postMessage({
+                    type: 'clearResults'
+                })
+                return
+            }
+            this.view?.webview.postMessage({
+                type: 'result',
+                line: line
+            })
+        })
+        
     }
 
     resolveWebviewView(webviewView: vscode.WebviewView, context: vscode.WebviewViewResolveContext, token: vscode.CancellationToken): Thenable<void> | void {
@@ -38,11 +77,11 @@ export class MagikClassBrowser implements vscode.WebviewViewProvider {
 
             switch(message.type) {
                 case 'ready':
+                    this.start()
                     webviewView.webview.postMessage({
                         type: 'enableSearch',
                         enabled: true
                     })
-                    // TODO: start/connect to class browser process 
                     break     
                 case 'textfield': 
                     name = message.name as 'class' | 'method'
@@ -65,6 +104,7 @@ export class MagikClassBrowser implements vscode.WebviewViewProvider {
                         name,
                         selected: this.searchParameters[name]
                     })
+                    this.search()
                     break
             }
         })
@@ -83,7 +123,21 @@ export class MagikClassBrowser implements vscode.WebviewViewProvider {
     }
 
     search() {
-        console.log('Searching with params', this.searchParameters)
+        const query = [
+            'unadd class',
+            `add class ${this.searchParameters.class}`,
+            `method_name ${this.searchParameters.method}`,
+            this.searchParameters.args ? 'show_args' : 'dont_show_args',
+            this.searchParameters.comments ? 'show_comments' : 'dont_show_comments',
+            'show_topics',
+            'override_flags',
+            'override_topics',
+            this.searchParameters.local ? 'local_only' : 'inherit_all',
+            'add deprecated',
+            `method_cut_off ${100}`,
+            'print_curr_methods\n',
+        ];
+        this.process!.stdin.write(query.join('\n'))
     }
 
     private htmlForWebview(webview: vscode.Webview) {
