@@ -140,6 +140,13 @@
           },
           "default": [],
           "description": "A collection of GIS versions which can be used to start a session."
+        },
+        "magik-vs-code.classBrowserMaxResults": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 20000,
+          "default": 200,
+          "description": "Max amount of search results form the Magik class browser."
         }
       }
     }

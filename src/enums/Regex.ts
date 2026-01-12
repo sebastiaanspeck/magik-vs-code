@@ -14,4 +14,12 @@ export class Regex {
 	public static readonly DefineSharedConstant = /^[\w?]+.define_shared_constant\(:[\w?]+,/
 	public static readonly DefineSharedVariable = /^[\w?]+.define_shared_variable\(:[\w?]+,/
 	public static readonly Constant = /^(_global\s*)?_constant/
+	public static readonly ClassBrowser = {
+		Topic: /^\x14.*/,
+		Method: /^([\w?!(),<^\[\]]*) *IN *([\w?!]*):?([\w?!]*) *(A|B)? ?(S)? ?(Restr|Depr|Debug)? ?(private)? ?(classvar|classconst)? ?(.+)?/,
+		Comment: /\s*##.*/,
+		Total: /^>?\d+$/,
+		Info: /\s*\*\*\* .*/,
+		Arguments: /^(.*?)(?:\s*OPT\s*(.*?))?(?:\s*GATH\s*(.*?))?$/
+	} as const
 }

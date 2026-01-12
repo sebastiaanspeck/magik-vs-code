@@ -2,8 +2,10 @@ import * as vscode from 'vscode'
 import { getContext } from '../utils/state'
 import { createInterface } from 'readline'
 import { ChildProcessWithoutNullStreams, spawn } from 'child_process'
-import { magikSession } from '../extension'
+import { config, magikSession } from '../extension'
 import path from 'path'
+import { Regex } from '../enums/Regex'
+import { MagikClassBrowserMethod } from './MagikClassBrowserMethod'
 
 export class MagikClassBrowser implements vscode.WebviewViewProvider {
     processID: number
@@ -15,12 +17,15 @@ export class MagikClassBrowser implements vscode.WebviewViewProvider {
         method: '',
         local: false,
         args: false,
-        comments: false
+        comments: false,
+        maxResults: 200
     }
+    methodBuffer: MagikClassBrowserMethod[] = []
 
     constructor(processID: number) {
-        this.processID = processID
         this.context = getContext()
+        this.processID = processID
+        this.searchParameters.maxResults = config.get<number>('classBrowserMaxResults')!
         this.enableCommands()   
     }
 
@@ -44,24 +49,51 @@ export class MagikClassBrowser implements vscode.WebviewViewProvider {
             output: this.process.stdin
         })
 
-        lineReader.on('line', (line) => {
-            if(line.includes('')) {
-                // TODO: these seem to be topics, maybe do something with them
-                return
-            }
-
-            if(line.includes(' *** ')){
-                this.view?.webview.postMessage({
-                    type: 'clearResults'
-                })
-                return
-            }
-            this.view?.webview.postMessage({
-                type: 'result',
-                line: line
-            })
+        lineReader.on('line', line => {
+            this.processLine(line)
         })
+    }
+
+    processLine(line: string) {
+        line = line.replace('\x05', '')
+
+        this.view?.webview.postMessage({
+            type: 'result',
+            line: line
+        })
+
+        if(Regex.ClassBrowser.Method.test(line)) {
+            const method = new MagikClassBrowserMethod(line)
+            this.methodBuffer.push(method)
+            return 
+        }    
+
+        if(Regex.ClassBrowser.Comment.test(line)) {
+            this.methodBuffer.at(-1)?.appendComment(line)
+            return 
+        }    
         
+        if(Regex.ClassBrowser.Total.test(line)) {
+            console.log(this.methodBuffer)
+            return
+        }
+        
+        if(Regex.ClassBrowser.Info.test(line)) {
+            this.view?.webview.postMessage({
+                type: 'clearResults'
+            })
+            this.methodBuffer = []
+            return
+        }
+        
+        if(Regex.ClassBrowser.Topic.test(line)) {
+            return
+        }
+
+        // If none of the above and not empty, must be args
+        if(line.trim()) {
+            this.methodBuffer.at(-1)?.setArguments(line)
+        }
     }
 
     resolveWebviewView(webviewView: vscode.WebviewView, context: vscode.WebviewViewResolveContext, token: vscode.CancellationToken): Thenable<void> | void {
@@ -134,8 +166,8 @@ export class MagikClassBrowser implements vscode.WebviewViewProvider {
             'override_topics',
             this.searchParameters.local ? 'local_only' : 'inherit_all',
             'add deprecated',
-            `method_cut_off ${100}`,
-            'print_curr_methods\n',
+            `method_cut_off ${this.searchParameters.maxResults}`,
+            'print_curr_methods\n'
         ];
         this.process!.stdin.write(query.join('\n'))
     }

@@ -76,9 +76,8 @@
     }
   };
 
-  // Handle messages sent from the extension to the webview
   window.addEventListener('message', event => {
-    const message = event.data; // The json data that the extension sent
+    const message = event.data;
     switch (message.type) {
       case 'updateTextfield': 
         setTextfield(message.name, message.value)
@@ -96,6 +95,7 @@
         enableSearch(message.enabled);
         break;
       case 'result':
+        console.log('result', message)
         const methodElement = document.createElement('li')
         const span = document.createElement('span')
         span.appendChild(document.createTextNode(message.line))
