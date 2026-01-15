@@ -16,7 +16,7 @@ export class Regex {
 	public static readonly Constant = /^(_global\s*)?_constant/
 	public static readonly ClassBrowser = {
 		Topic: /^\x14.*/,
-		Method: /^([\w?!(),<^\[\]]*) *IN *([\w?!]*):?([\w?!]*) *(A|B|Restr)? ?(S)? ?(Depr|Debug)? ?(iter)? ?(private)? ?(classvar|classconst)? ?(.+)?/,
+		Method: /^([\w?!(),<^\[\]]*) *IN *([\w?!]*):?(<?[\w?!]*>?) *(A|B|Restr)? ?(S)? ?(Depr|Debug)? ?(iter)? ?(private)? ?(classvar|classconst)? ?(.+)?/,
 		Comment: /\s*##.*/,
 		Total: /^>?\d+$/,
 		Info: /\s*\*\*\* .*/,

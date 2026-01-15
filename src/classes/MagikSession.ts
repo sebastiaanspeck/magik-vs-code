@@ -26,8 +26,8 @@ export class MagikSession {
         this.gisAliasPath = gisAliasPath
         this.gisAliasName = gisAliasName
         this.environmentPath = environmentPath
-        this.start()
-        this.openNotebook()
+        this.startProcess()
+        this.createNotebook()
         this.enableCommands()
     } 
 
@@ -35,7 +35,7 @@ export class MagikSession {
         return !this.process.killed
     }
 
-    private start() {
+    private startProcess() {
         const runaliasPath = `${this.gisVersionPath}\\bin\\x86\\runalias.exe`
         const runaliasArgs = ['-a', this.gisAliasPath]
         if(this.environmentPath) {
@@ -63,13 +63,19 @@ export class MagikSession {
         }
     }
 
-    private async openNotebook() {
+    private async createNotebook() {
         this.notebook = await vscode.workspace.openNotebookDocument(magikNotebookController.notebookType)
-        await vscode.window.showNotebookDocument(this.notebook)
+        await this.showNotebook()
         await vscode.commands.executeCommand('notebook.cell.execute', {
             ranges: [new vscode.NotebookRange(0, 1)],
             document: this.notebook.uri
         })
+    }
+
+    async showNotebook() {
+        await vscode.window.showNotebookDocument(this.notebook)
+        await vscode.commands.executeCommand('notebook.focusBottom')
+        await vscode.commands.executeCommand('notebook.cell.edit')
     }
 
     private enableCommands() {
@@ -81,12 +87,14 @@ export class MagikSession {
             vscode.commands.registerTextEditorCommand('magik-vs-code.sendSectionAtCurrentPositionToSession', this.sendSectionAtCurrentPosition, this),
             vscode.commands.registerCommand('magik-vs-code.sendFileToSession', this.sendSection, this),
             vscode.commands.registerCommand('magik-vs-code.removeExemplar', this.removeExemplar, this),
+            vscode.commands.registerCommand('magik-vs-code.showSession', this.showNotebook, this),
             vscode.commands.registerCommand('magik-vs-code.showClassBrowser', this.showClassBrowser, this),
             vscode.languages.registerCodeLensProvider({
                 scheme: 'file',
                 language: 'magik'
             }, this.codeLensProvider)
         )
+        vscode.commands.executeCommand('setContext', 'magik-vs-code.sessionIsActive', true)
     }
 
     async sendSectionAtCurrentPosition(editor: vscode.TextEditor) {

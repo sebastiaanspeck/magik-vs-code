@@ -129,7 +129,12 @@ export class MagikClassBrowser implements vscode.WebviewViewProvider {
     }
 
     show() {
-        this.view?.show(false)
+        if(!this.view?.visible) {
+            this.view?.show(false)
+        }
+        else {
+            this.focus()
+        }
     }
 
     focus(input?: 'class' | 'method') {
