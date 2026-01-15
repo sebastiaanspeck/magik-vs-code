@@ -127,6 +127,10 @@ export class MagikSession {
         if(!this.classBrowser) {
             await this.send('method_finder.start_acp()')
             const processID = await this.send('system.process_id')
+            if(Number(processID) === 0) {
+                vscode.window.showErrorMessage('Unable to start class browser, please try again.')
+                return
+            }
             this.classBrowser = new MagikClassBrowser(Number(processID))
         }
         this.classBrowser.show()

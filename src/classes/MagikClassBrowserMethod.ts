@@ -1,13 +1,14 @@
 import { Regex } from "../enums/Regex"
 
 export class MagikClassBrowserMethod {
-    method: string
     package: string
     class: string
-    level?: MethodClassifyLevel
-    isSubclassable: boolean
+    method: string
+    level?: 'advanced' | 'basic' | 'restricted' | 'deprecated' | 'debug'
+    type: 'method' | 'variable' | 'constant'
     isPrivate: boolean
-    type?: MethodType
+    isSubclassable: boolean
+    isIterator: boolean
     topics: string[]
     comments: string[] = []
     arguments = {
@@ -15,17 +16,45 @@ export class MagikClassBrowserMethod {
         optional: [] as string[],
         gather: undefined as string | undefined
     }
+    raw: string
 
     constructor(rawMethod: string) {
+        this.raw = rawMethod
         const parsed = Regex.ClassBrowser.Method.exec(rawMethod)!
         this.method = parsed[1]
         this.package = parsed[2]
         this.class = parsed[3]
-        this.level = parsed[4] as MethodClassifyLevel ?? parsed[6] as MethodClassifyLevel
         this.isSubclassable = parsed[5] === 'S'
-        this.isPrivate = parsed[7] === 'private'
-        this.type = parsed[8] as MethodType
-        this.topics = parsed[9]?.trim().split(' ') ?? []
+        this.isIterator = parsed[7] === 'iter'
+        this.isPrivate = parsed[8] === 'private'
+        this.topics = parsed[10]?.trim().split(' ') ?? []
+        switch(parsed[4] ?? parsed[6]) {
+            case 'A':
+                this.level = 'advanced'
+                break
+            case 'B':
+                this.level = 'basic'
+                break
+            case 'Restr':
+                this.level = 'restricted'
+                break
+            case 'Depr':
+                this.level = 'deprecated'
+                break
+            case 'Debug':
+                this.level = 'debug'
+                break
+        }
+        switch(parsed[9]) {
+            case 'classvar':
+                this.type = 'variable'
+                break
+            case 'classconst':
+                this.type = 'constant'
+                break
+            default:
+                this.type = 'method'
+        }
     }
 
     appendComment(rawComment: string) {
@@ -43,6 +72,3 @@ export class MagikClassBrowserMethod {
         this.arguments.gather = gather
     }
 }
-
-type MethodClassifyLevel = 'A' | 'B' | 'Restr' | 'Depr' | 'Debug'
-type MethodType = 'classvar' | 'classconst'

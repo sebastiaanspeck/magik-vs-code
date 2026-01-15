@@ -26,6 +26,7 @@ export class MagikClassBrowser implements vscode.WebviewViewProvider {
         this.context = getContext()
         this.processID = processID
         this.searchParameters.maxResults = config.get<number>('classBrowserMaxResults')!
+        this.start()
         this.enableCommands()   
     }
 
@@ -36,7 +37,7 @@ export class MagikClassBrowser implements vscode.WebviewViewProvider {
         )
     }
 
-    async start() {
+    private start() {
         console.log('PID', this.processID)
         const methodFinderPath = path.join(magikSession.gisVersionPath, 'etc', 'x86', 'mf_connector.exe')
         const startCommand = `${methodFinderPath} -m //./pipe/method_finder/${this.processID}`
@@ -55,12 +56,8 @@ export class MagikClassBrowser implements vscode.WebviewViewProvider {
     }
 
     processLine(line: string) {
+        // Remove ASCII escape ENQ char
         line = line.replace('\x05', '')
-
-        this.view?.webview.postMessage({
-            type: 'result',
-            line: line
-        })
 
         if(Regex.ClassBrowser.Method.test(line)) {
             const method = new MagikClassBrowserMethod(line)
@@ -74,13 +71,17 @@ export class MagikClassBrowser implements vscode.WebviewViewProvider {
         }    
         
         if(Regex.ClassBrowser.Total.test(line)) {
-            console.log(this.methodBuffer)
+            this.view?.webview.postMessage({
+                type: 'results',
+                results: this.methodBuffer,
+                total: line
+            })
             return
         }
         
         if(Regex.ClassBrowser.Info.test(line)) {
             this.view?.webview.postMessage({
-                type: 'clearResults'
+                type: 'clear'
             })
             this.methodBuffer = []
             return
@@ -109,42 +110,26 @@ export class MagikClassBrowser implements vscode.WebviewViewProvider {
 
             switch(message.type) {
                 case 'ready':
-                    this.start()
-                    webviewView.webview.postMessage({
-                        type: 'enableSearch',
-                        enabled: true
-                    })
+                    this.toggleWebviewInputs()
+                    this.focus()
                     break     
                 case 'textfield': 
                     name = message.name as 'class' | 'method'
                     this.searchParameters[name] = message.value
-                    webviewView.webview.postMessage({
-                        type: 'updateTextfield',
-                        name,
-                        value: message.value
-                    })
-                    this.search()
                     break           
                 case 'button':
-                    name = message.name as 'local' | 'args' | 'comments' | 'connect'
-                    if(name === 'connect') {
-                        break
-                    }
+                    name = message.name as 'local' | 'args' | 'comments'
                     this.searchParameters[name] = !this.searchParameters[name]
-                    webviewView.webview.postMessage({
-                        type: 'updateButton',
-                        name,
-                        selected: this.searchParameters[name]
-                    })
-                    this.search()
                     break
             }
+            
+            this.search()
+            this.updateWebviewSearchParameters()
         })
     }
 
     show() {
         this.view?.show(false)
-        this.focus()
     }
 
     focus(input?: 'class' | 'method') {
@@ -172,6 +157,20 @@ export class MagikClassBrowser implements vscode.WebviewViewProvider {
         this.process!.stdin.write(query.join('\n'))
     }
 
+    toggleWebviewInputs(enabled = true) {
+        this.view?.webview.postMessage({
+            type: 'enable',
+            enabled
+        })
+    }
+
+    updateWebviewSearchParameters() {
+        this.view?.webview.postMessage({
+            type: 'parameters',
+            parameters: this.searchParameters
+        })
+    }
+
     private htmlForWebview(webview: vscode.Webview) {
         const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'src/webviews/class_browser/main.js'))
         const styleResetUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'src/webviews/class_browser/reset.css'))
@@ -193,6 +192,8 @@ export class MagikClassBrowser implements vscode.WebviewViewProvider {
                 <link href="${styleResetUri}" rel="stylesheet"/>
 				<link href="${styleVSCodeUri}" rel="stylesheet"/>
 				<link href="${styleUri}" rel="stylesheet"/>
+
+                <link href="${iconsUri}" rel="stylesheet"/>
 
 				<title>Magik Class Browser</title>
 			</head>

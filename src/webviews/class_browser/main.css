@@ -93,15 +93,39 @@ body {
 }
 
 .basic {
-	color: var(--vscode-debugIcon-startForeground);
+  	color: var(--vscode-editorInfo-foreground);
+}
+
+.restricted {
+  	color: var(--vscode-editorWarning-foreground);
+}
+
+.deprecated {
+  	color: var(--vscode-editorError-foreground);
+}
+
+.debug {
+  	color: var(--vscode-debugIcon-startForeground);
+}
+
+.level-unknown {
+	color: var(--vscode-symbolIcon-booleanForeground);
+}
+
+.optional-gather {
+	color: var(--vscode-symbolIcon-fieldForeground);
+}
+
+.modifier {
+	color: var(--vscode-symbolIcon-fieldForeground);
 }
 
 .class-entry {
-	color: var(--vscode-debugIcon-startForeground);
+	color: var(--vscode-symbolIcon-classForeground);
 }
 
 .method-entry {
-	color: var(--vscode-textLink-foreground);
+	color: var(--vscode-symbolIcon-methodForeground);
 }
 
 .info-entry {
