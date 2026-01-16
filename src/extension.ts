@@ -34,7 +34,6 @@ class MagikNotebookSerializer implements vscode.NotebookSerializer {
 		content: Uint8Array,
 		_token: vscode.CancellationToken
 	): Promise<vscode.NotebookData> {
-		// TODO: Deserialize instead of creating new empty Magik notebook
 		return new vscode.NotebookData([
 			new vscode.NotebookCellData(vscode.NotebookCellKind.Code, '', 'magik')
 		]);
@@ -44,7 +43,6 @@ class MagikNotebookSerializer implements vscode.NotebookSerializer {
 		data: vscode.NotebookData,
 		_token: vscode.CancellationToken
 	): Promise<Uint8Array> {
-		// TODO: Serialize instead of just saving an empty string
 		return new TextEncoder().encode('');
 	}
 }

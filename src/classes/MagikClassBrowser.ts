@@ -18,6 +18,11 @@ export class MagikClassBrowser implements vscode.WebviewViewProvider {
         local: false,
         args: false,
         comments: false,
+        basic: true,
+        advanced: true,
+        restricted: true,
+        deprecated: true,
+        debug: true,
         maxResults: 200
     }
     methodBuffer: MagikClassBrowserMethod[] = []
@@ -35,11 +40,13 @@ export class MagikClassBrowser implements vscode.WebviewViewProvider {
             vscode.window.registerWebviewViewProvider('magik-vs-code.classBrowser', this),
             vscode.commands.registerCommand('magik-vs-code.searchClassBrowser', this.search, this)
         )
+        // Enables keybindings with 'magik-vs-code.classBrowserIsActive' when-clause
+        vscode.commands.executeCommand('setContext', 'magik-vs-code.classBrowserIsActive', true)
     }
 
     private start() {
-        console.log('PID', this.processID)
         const methodFinderPath = path.join(magikSession.gisVersionPath, 'etc', 'x86', 'mf_connector.exe')
+        // TODO: Use method_finder.socket_pathname instead of hardcoding pipe
         const startCommand = `${methodFinderPath} -m //./pipe/method_finder/${this.processID}`
         this.process = spawn(startCommand, {
             shell: true
@@ -152,13 +159,18 @@ export class MagikClassBrowser implements vscode.WebviewViewProvider {
             this.searchParameters.args ? 'show_args' : 'dont_show_args',
             this.searchParameters.comments ? 'show_comments' : 'dont_show_comments',
             'show_topics',
-            'override_flags',
+            // 'override_flags',
             'override_topics',
             this.searchParameters.local ? 'local_only' : 'inherit_all',
-            'add deprecated',
+            this.searchParameters.basic ? 'add basic' : 'unadd basic',
+            this.searchParameters.advanced ? 'add advanced' : 'unadd advanced',
+            this.searchParameters.restricted ? 'add restricted' : 'unadd restricted',
+            this.searchParameters.deprecated ? 'add deprecated' : 'unadd deprecated',
+            this.searchParameters.debug ? 'add debug' : 'unadd debug',
             `method_cut_off ${this.searchParameters.maxResults}`,
             'print_curr_methods\n'
         ];
+        console.log(query)
         this.process!.stdin.write(query.join('\n'))
     }
 
@@ -209,6 +221,11 @@ export class MagikClassBrowser implements vscode.WebviewViewProvider {
                     <button id="localButton" name="local" class="info-button" disabled>Local</button>
                     <button id="argsButton" name="args" class="info-button" disabled>Args</button>
                     <button id="commentsButton" name="comments" class="info-button" disabled>Comments</button>
+                    <button id="basicButton" name="basic" class="info-button" disabled>Basic</button>
+                    <button id="advancedButton" name="advanced" class="info-button" disabled>Advanced</button>
+                    <button id="restrictedButton" name="restricted" class="info-button" disabled>Restricted</button>
+                    <button id="deprecatedButton" name="deprecated" class="info-button" disabled>Deprecated</button>
+                    <button id="debugButton" name="debug" class="info-button" disabled>Debug</button>
                 </div>
                 <div>
                     <span class="results-length"></span>

@@ -7,16 +7,27 @@
 (function main() {
   const vscode = acquireVsCodeApi();
 
-  const methodInput = document.querySelector('#methodInput');
-  const classInput = document.querySelector('#classInput');
+  const methodInput = document.querySelector('#methodInput')
+  const classInput = document.querySelector('#classInput')
+
   const localButton = document.querySelector('#localButton')
   const argsButton = document.querySelector('#argsButton')
   const commentsButton = document.querySelector('#commentsButton')
+
+  const basicButton = document.querySelector('#basicButton')
+  const advancedButton = document.querySelector('#advancedButton')
+  const restrictedButton = document.querySelector('#restrictedButton')
+  const deprecatedButton = document.querySelector('#deprecatedButton')
+  const debugButton = document.querySelector('#debugButton')
+
   const resultsCounter = document.querySelector('.results-length')
   const resultsList = document.querySelector('.results-list')
 
   const textfields = [methodInput, classInput]
-  const buttons = [localButton, argsButton, commentsButton]
+  const buttons = [
+    localButton, argsButton, commentsButton, 
+    basicButton, advancedButton, restrictedButton, deprecatedButton, debugButton
+  ]
   const inputs = [...textfields, ...buttons]
 
   let navigationElements = [];
@@ -110,7 +121,6 @@
   }
 
   function updateSearchParameters(searchParameters) {
-    console.log('params', searchParameters)
     for(const [name, value] of Object.entries(searchParameters)) {
       const input = inputs.find(input => input.name === name)
       if(!input) {
@@ -165,8 +175,11 @@
       typeIcon.setAttribute('title', capitalizeFirstLetter(tooltip))
       methodElement.appendChild(typeIcon);
   
-      addText(methodElement, result.package);
-      addText(methodElement, '\u2004:\u2004');
+      if(result.package) {
+        addText(methodElement, result.package);
+        addText(methodElement, '\u2004:\u2004');
+      }
+
       addText(methodElement, result.class, 'class-entry');
       addText(methodElement, '\u2004.\u2004');
       if(result.method.endsWith('()')) {
@@ -203,14 +216,6 @@
         methodElement.appendChild(privateIcon);
       }
       
-      if(result.isIterator) {
-        addText(methodElement, '\u2004\u2004');
-        const iteratorIcon = document.createElement('div')
-        iteratorIcon.classList.add('codicon', `codicon-sync`, 'modifier')
-        iteratorIcon.setAttribute('title', 'Iterator')
-        methodElement.appendChild(iteratorIcon);
-      }
-      
       if(result.isSubclassable) {
         addText(methodElement, '\u2004\u2004');
         const subclassableIcon = document.createElement('div')
@@ -218,75 +223,92 @@
         subclassableIcon.setAttribute('title', 'Subclassable')
         methodElement.appendChild(subclassableIcon);
       }
+
+      if(result.isRedefinable) {
+        addText(methodElement, '\u2004\u2004');
+        const subclassableIcon = document.createElement('div')
+        subclassableIcon.classList.add('codicon', `codicon-edit`, 'modifier')
+        subclassableIcon.setAttribute('title', 'Redefinable')
+        methodElement.appendChild(subclassableIcon);
+      }
+      
+      if(result.isIterator) {
+        addText(methodElement, '\u2004\u2004');
+        const iteratorIcon = document.createElement('div')
+        iteratorIcon.classList.add('codicon', `codicon-sync`, 'modifier')
+        iteratorIcon.setAttribute('title', 'Iterator')
+        methodElement.appendChild(iteratorIcon);
+      }
+
+      resultsList.appendChild(methodElement);
+
+      if(result.comments.length) {
+        addComments(result.comments)
+      }
   
-      // addText(methodElement, result.infoString, 'info-entry');
   
       methodElement.addEventListener('click', () => {
         console.log(result)
         // handleMethodClicked(result.className, result.methodName, result.package);
       });
   
-      resultsList.appendChild(methodElement);
     })
+  }
 
+  /**
+   * @param {string[]} comments 
+   */
+  function addComments(comments) {
+    comments.filter(comment => comment.type === 'parameter').forEach(addParameterComment)
+    comments.filter(comment => comment.type === 'return').forEach(addReturnComment)
+    comments.filter(comment => comment.type === 'text').forEach(addTextComment)
+  }
 
-      // const commentLines = methodData.commentLines
-      // const commentsLength = commentLines.length;
-      // if (methodData.argsString || commentsLength > 0) {
-      //   const ul = document.createElement('ul');
-      //   ul.className = 'info-list';
+  function addTextComment(textComment) {
+    const commentsElement = document.createElement('ul')
+    commentsElement.className = 'info-list'
+    const commentElement = document.createElement('li')
+    commentElement.className = 'comment-element'
+    addText(commentElement, textComment.text, 'comment-text')
+    commentsElement.appendChild(commentElement)
+    resultsList.appendChild(commentsElement)
+  }
 
-      //   if (methodData.argsString) {
-      //     const argElement = document.createElement('li');
-      //     argElement.className = 'args-element';
-      //     const str = methodData.argsString.trim().replace(/\s+/g, '\u2002\u2004');
-      //     const argsText = document.createTextNode(str);
-      //     argElement.appendChild(argsText);
-      //     ul.appendChild(argElement);
-      //   }
+  function addParameterComment(parameterComment) {
+    const commentsElement = document.createElement('ul')
+    commentsElement.className = 'info-list'
+    const commentElement = document.createElement('li')
+    commentElement.className = 'comment-element'
 
-      //   if (commentsLength > 0) {
-      //     let endIndex = 0;
-      //     for (let lineIndex = commentsLength - 1; lineIndex > -1; lineIndex--) {
-      //       const line = commentLines[lineIndex];
-      //       const commentParts = line.split('##');
-      //       const str = commentParts[commentParts.length - 1];
+    const parameterIcon = document.createElement('div')
+    parameterIcon.classList.add('codicon', `codicon-symbol-field`, 'modifier')
+    parameterIcon.setAttribute('title', 'Parameter')
+    commentElement.appendChild(parameterIcon);
 
-      //       if (str.trim().length !== 0) {
-      //         endIndex = lineIndex;
-      //         break;
-      //       }
-      //     }
+    addText(commentElement, `\u2004${parameterComment.parameter}`)
+    addText(commentElement, `\u2004${parameterComment.class}`, 'class-entry')
+    addText(commentElement, `\u2004${parameterComment.description}`, 'comment-text')
 
-      //     let checkEmpty = true;
-      //     for (let lineIndex = 0; lineIndex < endIndex + 1; lineIndex++) {
-      //       const line = commentLines[lineIndex];
-      //       const commentParts = line.split('##');
-      //       let str = commentParts[commentParts.length - 1];
+    commentsElement.appendChild(commentElement)
+    resultsList.appendChild(commentsElement)
+  }
 
-      //       if (str.trim().length === 0) {
-      //         if (checkEmpty) {
-      //           continue;
-      //         }
-      //         str = '\u2002';
-      //       }
-      //       checkEmpty = false;
+  function addReturnComment(returnComment) {
+    const commentsElement = document.createElement('ul')
+    commentsElement.className = 'info-list'
+    const commentElement = document.createElement('li')
+    commentElement.className = 'comment-element'
 
-      //       str = str.replace(/\s/gy, '\u2002');
+    const returnIcon = document.createElement('div')
+    returnIcon.classList.add('codicon', `codicon-newline`, 'modifier')
+    returnIcon.setAttribute('title', 'Return')
+    commentElement.appendChild(returnIcon);
 
-      //       const commentElement = document.createElement('li');
-      //       commentElement.className = 'comment-element';
-      //       const commentText = document.createTextNode(str);
-      //       commentElement.appendChild(commentText);
-      //       ul.appendChild(commentElement);
-      //     }
-      //   }
-
-      //   resultsList.appendChild(ul);
-      // }
-
-    // navigationElements = navElements;
-    // selectedElement = undefined;
+    addText(commentElement, `\u2004${returnComment.class}`, 'class-entry')
+    addText(commentElement, `\u2004${returnComment.description}`, 'comment-text')
+    
+    commentsElement.appendChild(commentElement)
+    resultsList.appendChild(commentsElement)
   }
 
   function enableSearch(enabled) {

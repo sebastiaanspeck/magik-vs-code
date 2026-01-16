@@ -94,6 +94,7 @@ export class MagikSession {
                 language: 'magik'
             }, this.codeLensProvider)
         )
+        // Enables keybindings with 'magik-vs-code.sessionIsActive' when-clause
         vscode.commands.executeCommand('setContext', 'magik-vs-code.sessionIsActive', true)
     }
 
