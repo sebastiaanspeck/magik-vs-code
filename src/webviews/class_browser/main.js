@@ -10,28 +10,12 @@
   const methodInput = document.querySelector('#methodInput')
   const classInput = document.querySelector('#classInput')
 
-  const localButton = document.querySelector('#localButton')
-  const argsButton = document.querySelector('#argsButton')
-  const commentsButton = document.querySelector('#commentsButton')
-
-  const basicButton = document.querySelector('#basicButton')
-  const advancedButton = document.querySelector('#advancedButton')
-  const restrictedButton = document.querySelector('#restrictedButton')
-  const deprecatedButton = document.querySelector('#deprecatedButton')
-  const debugButton = document.querySelector('#debugButton')
-
   const resultsCounter = document.querySelector('.results-length')
   const resultsList = document.querySelector('.results-list')
 
-  const textfields = [methodInput, classInput]
-  const buttons = [
-    localButton, argsButton, commentsButton, 
-    basicButton, advancedButton, restrictedButton, deprecatedButton, debugButton
-  ]
+  const textfields = document.querySelectorAll('input')
+  const buttons = document.querySelectorAll('button')
   const inputs = [...textfields, ...buttons]
-
-  let navigationElements = [];
-  let selectedElement;
 
   textfields.forEach(textfield => {
     textfield.addEventListener('input', debounce(() => {
@@ -53,19 +37,11 @@
   })
 
   document.onkeydown = (e) => {
-    const elementsLength = navigationElements.length;
     const activeElement = document.activeElement;
-    let newIndex;
     switch (e.key) {
       case 'Tab': 
-        if (activeElement === classInput) {
-          methodInput.focus()
-          e.preventDefault()
-        }
-        else if (activeElement === methodInput) {
-          classInput.focus()
-          e.preventDefault()
-        }
+        (activeElement === classInput ? methodInput : classInput).focus()
+        e.preventDefault()
         break
       case '/':
         if (activeElement === classInput || activeElement === methodInput) {
@@ -78,21 +54,13 @@
         }
         break
     }
-
-    if (elementsLength === 0) {
-      selectedElement = undefined;
-    } else if (newIndex !== undefined) {
-      selectedElement = navigationElements[newIndex];
-      selectedElement.focus();
-      return false;
-    }
   };
 
   window.addEventListener('message', event => {
     const message = event.data;
     switch (message.type) {
       case 'enable':
-        enableSearch(message.enabled);
+        enable(message.enabled);
         break;
       case 'parameters': 
         updateSearchParameters(message.parameters)
@@ -111,6 +79,20 @@
     }
   });
 
+  /**
+   * Enable/disable the class browser inputs
+   * @param {boolean} enabled 
+   */
+  function enable(enabled) {
+    textfields.forEach(textfield => textfield.disabled = !enabled)
+    buttons.forEach(button => button.disabled = !enabled)
+  }
+
+  /**
+   * Focusses and highlights the content of a search field
+   * @param {string} input Either 'method' or 'class'
+   * @returns 
+   */
   function focusInput(input) {
     if (classInput.classList.contains('disabled')) {
       return
@@ -120,6 +102,10 @@
     selectedInput.setSelectionRange(0, selectedInput.value.length);
   }
 
+  /**
+   * Update the current state of the class browser inputs
+   * @param {object} searchParameters 
+   */
   function updateSearchParameters(searchParameters) {
     for(const [name, value] of Object.entries(searchParameters)) {
       const input = inputs.find(input => input.name === name)
@@ -138,26 +124,56 @@
       else {
         input.classList.remove('selected')
       }
-
     }
   }
 
+  /**
+   * Clear the current search results and results counter
+   */
   function clearResultList() {
     resultsList.textContent = '';
     resultsCounter.textContent = '';
-    navigationElements = []
-    selectedElement = undefined;
   }
 
-  function addText(parent, text, className) {
-    const span = document.createElement('span');
+  /**
+   * Append text to an element
+   * @param {HTMLElement} element 
+   * @param {string} text 
+   * @param {string?} className 
+   */
+  function addText(element, text, className) {
+    const textElement = document.createElement('span');
     if (className) {
-      span.className = className;
+      textElement.className = className;
     }
-    span.appendChild(document.createTextNode(text));
-    parent.appendChild(span);
+    textElement.appendChild(document.createTextNode(text));
+    element.appendChild(textElement);
   }
 
+  /**
+   * Append an icon to an element
+   * @param {HTMLElement} element 
+   * @param {string} iconName 
+   * @param {string?} className 
+   * @param {string?} tooltip 
+   */
+  function addIcon(element, iconName, className, tooltip) {
+    const iconElement = document.createElement('div')
+    iconElement.classList.add('codicon', `codicon-${iconName}`)
+    if(className) {
+      iconElement.classList.add(className)
+    }
+    if(tooltip) {
+      iconElement.setAttribute('title', tooltip)
+    }
+    element.appendChild(iconElement)
+  }
+
+  /**
+   * Generate search result elements and update results counter
+   * @param {object[]} results 
+   * @param {string} resultsLength 
+   */
   function updateResultList(results, resultsLength) {
     resultsCounter.textContent = `${resultsLength} results found`;
 
@@ -183,62 +199,23 @@
       addText(methodElement, result.class, 'class-entry');
       addText(methodElement, '\u2004.\u2004');
       if(result.method.endsWith('()')) {
-        addText(methodElement, result.method.slice(0, -1) + '\u2004', 'method-entry')
-        
-        const requiredArgs = result.arguments.required
-        if(requiredArgs.length) {
-          addText(methodElement, `${requiredArgs.join(', ')}\u2004`)
-        }
-
-        const optionalArgs = result.arguments.optional
-        if(optionalArgs.length) {
-          addText(methodElement, 'OPTIONAL', 'optional-gather')
-          addText(methodElement, `\u2004${optionalArgs.join(', ')}\u2004`)
-        }
-
-        const gatherArg = result.arguments.gather
-        if(gatherArg) {
-          addText(methodElement, 'GATHER', 'optional-gather')
-          addText(methodElement, `\u2004${gatherArg}\u2004`)
-        }
-
-        addText(methodElement, ')', 'method-entry')
+        addArguments(methodElement, result)
       }
       else {
         addText(methodElement, result.method, 'method-entry');
       }
 
-      if(result.isPrivate) {
-        addText(methodElement, '\u2004\u2004');
-        const privateIcon = document.createElement('div')
-        privateIcon.classList.add('codicon', `codicon-lock`, 'modifier')
-        privateIcon.setAttribute('title', 'Private')
-        methodElement.appendChild(privateIcon);
-      }
-      
-      if(result.isSubclassable) {
-        addText(methodElement, '\u2004\u2004');
-        const subclassableIcon = document.createElement('div')
-        subclassableIcon.classList.add('codicon', `codicon-type-hierarchy-sub`, 'modifier')
-        subclassableIcon.setAttribute('title', 'Subclassable')
-        methodElement.appendChild(subclassableIcon);
-      }
-
-      if(result.isRedefinable) {
-        addText(methodElement, '\u2004\u2004');
-        const subclassableIcon = document.createElement('div')
-        subclassableIcon.classList.add('codicon', `codicon-edit`, 'modifier')
-        subclassableIcon.setAttribute('title', 'Redefinable')
-        methodElement.appendChild(subclassableIcon);
-      }
-      
-      if(result.isIterator) {
-        addText(methodElement, '\u2004\u2004');
-        const iteratorIcon = document.createElement('div')
-        iteratorIcon.classList.add('codicon', `codicon-sync`, 'modifier')
-        iteratorIcon.setAttribute('title', 'Iterator')
-        methodElement.appendChild(iteratorIcon);
-      }
+      [
+        { name: 'private', icon: 'lock' },
+        { name: 'subclassable', icon: 'type-hierarchy-sub' },
+        { name: 'redefinable', icon: 'edit' },
+        { name: 'iterator', icon: 'sync' },
+      ].forEach(modifier => {
+        if(result[modifier.name]) {
+          addText(methodElement, '\u2004\u2004');
+          addIcon(methodElement, modifier.icon, 'modifier', modifier.name)
+        }
+      })
 
       resultsList.appendChild(methodElement);
 
@@ -246,16 +223,43 @@
         addComments(result.comments)
       }
   
-  
       methodElement.addEventListener('click', () => {
         console.log(result)
         // handleMethodClicked(result.className, result.methodName, result.package);
       });
-  
     })
   }
 
   /**
+   * Append style method arguments to an element
+   * @param {HTMLElement} element 
+   * @param {object} result 
+   */
+  function addArguments(element, result) {
+    addText(element, result.method.slice(0, -1) + '\u2004', 'method-entry')
+    
+    const requiredArgs = result.arguments.required
+    if(requiredArgs.length) {
+      addText(element, `${requiredArgs.join(', ')}\u2004`)
+    }
+
+    const optionalArgs = result.arguments.optional
+    if(optionalArgs.length) {
+      addText(element, 'OPTIONAL', 'optional-gather')
+      addText(element, `\u2004${optionalArgs.join(', ')}\u2004`)
+    }
+
+    const gatherArg = result.arguments.gather
+    if(gatherArg) {
+      addText(element, 'GATHER', 'optional-gather')
+      addText(element, `\u2004${gatherArg}\u2004`)
+    }
+
+    addText(element, ')', 'method-entry')
+  }
+
+  /**
+   * Add styled method comments to the last method element
    * @param {string[]} comments 
    */
   function addComments(comments) {
@@ -264,27 +268,33 @@
     comments.filter(comment => comment.type === 'text').forEach(addTextComment)
   }
 
+  /**
+   * Add styled text comment
+   * @param {object} textComment 
+   */
   function addTextComment(textComment) {
     const commentsElement = document.createElement('ul')
     commentsElement.className = 'info-list'
     const commentElement = document.createElement('li')
     commentElement.className = 'comment-element'
+
     addText(commentElement, textComment.text, 'comment-text')
+
     commentsElement.appendChild(commentElement)
     resultsList.appendChild(commentsElement)
   }
 
+  /**
+   * Add styled parameter comment
+   * @param {object} parameterComment 
+   */
   function addParameterComment(parameterComment) {
     const commentsElement = document.createElement('ul')
     commentsElement.className = 'info-list'
     const commentElement = document.createElement('li')
     commentElement.className = 'comment-element'
 
-    const parameterIcon = document.createElement('div')
-    parameterIcon.classList.add('codicon', `codicon-symbol-field`, 'modifier')
-    parameterIcon.setAttribute('title', 'Parameter')
-    commentElement.appendChild(parameterIcon);
-
+    addIcon(commentElement, 'symbol-field', 'modifier', 'parameter')
     addText(commentElement, `\u2004${parameterComment.parameter}`)
     addText(commentElement, `\u2004${parameterComment.class}`, 'class-entry')
     addText(commentElement, `\u2004${parameterComment.description}`, 'comment-text')
@@ -293,17 +303,17 @@
     resultsList.appendChild(commentsElement)
   }
 
+  /**
+   * Add styled return value comment
+   * @param {object} returnComment 
+   */
   function addReturnComment(returnComment) {
     const commentsElement = document.createElement('ul')
     commentsElement.className = 'info-list'
     const commentElement = document.createElement('li')
     commentElement.className = 'comment-element'
 
-    const returnIcon = document.createElement('div')
-    returnIcon.classList.add('codicon', `codicon-newline`, 'modifier')
-    returnIcon.setAttribute('title', 'Return')
-    commentElement.appendChild(returnIcon);
-
+    addIcon(commentElement, 'newline', 'modifier', 'return')
     addText(commentElement, `\u2004${returnComment.class}`, 'class-entry')
     addText(commentElement, `\u2004${returnComment.description}`, 'comment-text')
     
@@ -311,11 +321,12 @@
     resultsList.appendChild(commentsElement)
   }
 
-  function enableSearch(enabled) {
-    textfields.forEach(textfield => textfield.disabled = !enabled)
-    buttons.forEach(button => button.disabled = !enabled)
-  }
-
+  /**
+   * Debounce a function call
+   * @param {function} callback 
+   * @param {number} wait In milliseconds
+   * @returns 
+   */
   function debounce(callback, wait) {
     let timeout;
     return (...args) => {
@@ -325,13 +336,14 @@
     };
   }
 
-  function handleMethodClicked(className, methodName, packageName) {
-    vscode.postMessage({type: 'methodSelected', className, methodName, packageName,});
-  }
-
-  function capitalizeFirstLetter(string) {
-    const firstLetter = string.charAt(0)
-    return string.replace(firstLetter, firstLetter.toUpperCase())
+  /**
+   * Capitalize the first letter of a line
+   * @param {string} line 
+   * @returns 
+   */
+  function capitalizeFirstLetter(line) {
+    const firstLetter = line.charAt(0)
+    return line.replace(firstLetter, firstLetter.toUpperCase())
   }
 
   vscode.postMessage({type: 'ready'});

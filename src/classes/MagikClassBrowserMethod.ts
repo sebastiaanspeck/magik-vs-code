@@ -6,10 +6,10 @@ export class MagikClassBrowserMethod {
     method: string
     level?: 'advanced' | 'basic' | 'restricted' | 'deprecated' | 'debug'
     type: 'method' | 'variable' | 'constant'
-    isPrivate: boolean
-    isSubclassable: boolean
-    isRedefinable: boolean
-    isIterator: boolean
+    private: boolean
+    subclassable: boolean
+    redefinable: boolean
+    iterator: boolean
     topics: string[]
     comments: Comment[] = []
     arguments = {
@@ -25,10 +25,10 @@ export class MagikClassBrowserMethod {
         this.method = methodMatch[1]
         this.package = methodMatch[2]
         this.class = methodMatch[3]
-        this.isSubclassable = methodMatch[5] === 'S'
-        this.isRedefinable = methodMatch[6] === 'Redef'
-        this.isIterator = methodMatch[8] === 'iter'
-        this.isPrivate = methodMatch[9] === 'private'
+        this.subclassable = methodMatch[5] === 'S'
+        this.redefinable = methodMatch[6] === 'Redef'
+        this.iterator = methodMatch[8] === 'iter'
+        this.private = methodMatch[9] === 'private'
         this.topics = methodMatch[11]?.trim().split(' ') ?? []
         switch(methodMatch[4] ?? methodMatch[7]) {
             case 'A':

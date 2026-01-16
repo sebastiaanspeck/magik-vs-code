@@ -170,7 +170,6 @@ export class MagikClassBrowser implements vscode.WebviewViewProvider {
             `method_cut_off ${this.searchParameters.maxResults}`,
             'print_curr_methods\n'
         ];
-        console.log(query)
         this.process!.stdin.write(query.join('\n'))
     }
 
