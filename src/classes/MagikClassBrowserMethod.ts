@@ -21,16 +21,16 @@ export class MagikClassBrowserMethod {
 
     constructor(rawMethod: string) {
         this.raw = rawMethod
-        const methodMatch = Regex.ClassBrowser.Method.exec(rawMethod)!
-        this.method = methodMatch[1]
-        this.package = methodMatch[2]
-        this.class = methodMatch[3]
-        this.subclassable = methodMatch[5] === 'S'
-        this.redefinable = methodMatch[6] === 'Redef'
-        this.iterator = methodMatch[8] === 'iter'
-        this.private = methodMatch[9] === 'private'
-        this.topics = methodMatch[11]?.trim().split(' ') ?? []
-        switch(methodMatch[4] ?? methodMatch[7]) {
+        const parsedMethod = Regex.ClassBrowser.Method.exec(rawMethod)!.groups!
+        this.method = parsedMethod.method
+        this.package = parsedMethod.package
+        this.class = parsedMethod.class
+        this.subclassable = parsedMethod.subclassable === 'S'
+        this.redefinable = parsedMethod.redefinable === 'Redef'
+        this.iterator = parsedMethod.iterator === 'iter'
+        this.private = parsedMethod.private === 'private'
+        this.topics = parsedMethod.topics?.trim().split(' ') ?? []
+        switch(parsedMethod.level1 ?? parsedMethod.level2) {
             case 'A':
                 this.level = 'advanced'
                 break
@@ -47,7 +47,7 @@ export class MagikClassBrowserMethod {
                 this.level = 'debug'
                 break
         }
-        switch(methodMatch[10]) {
+        switch(parsedMethod.type) {
             case 'classvar':
                 this.type = 'variable'
                 break
@@ -59,26 +59,32 @@ export class MagikClassBrowserMethod {
         }
     }
 
-    appendComment(rawComment: string) {
+    appendComment(rawComment: string, showArgs?: boolean) {
         const comment = rawComment.replace('##', '').trim()
         
-        const parameterCommentMatch = Regex.ClassBrowser.ParameterComment.exec(comment)
-        if(parameterCommentMatch) {
+        const parsedParameterComment = Regex.ClassBrowser.ParameterComment.exec(comment)?.groups
+        if(parsedParameterComment) {
+            if(showArgs === false) {
+                return
+            }
             this.comments.push({
                 type: 'parameter',
-                class: parameterCommentMatch[1],
-                parameter: parameterCommentMatch[2],
-                description: parameterCommentMatch[3]
+                class: parsedParameterComment.class,
+                parameter: parsedParameterComment.parameter,
+                description: parsedParameterComment.description
             })
             return 
         }
         
-        const returnCommentMatch = Regex.ClassBrowser.ReturnComment.exec(comment)
-        if(returnCommentMatch) {
+        const parsedReturnComment = Regex.ClassBrowser.ReturnComment.exec(comment)?.groups
+        if(parsedReturnComment) {
+            if(showArgs === false) {
+                return
+            }
             this.comments.push({
                 type: 'return',
-                class: returnCommentMatch[1],
-                description: returnCommentMatch[2]
+                class: parsedReturnComment.class,
+                description: parsedReturnComment.description
             })
             return
         }
@@ -91,14 +97,14 @@ export class MagikClassBrowserMethod {
     }
 
     setArguments(rawArguments: string) {
-        const [_, rawRequired, rawOptional, gather] = Regex.ClassBrowser.Arguments.exec(rawArguments.trim())!
-        if(rawRequired) {
-            this.arguments.required = rawRequired.split(' ')
+        const parsedArguments = Regex.ClassBrowser.Arguments.exec(rawArguments.trim())!.groups!
+        if(parsedArguments.required) {
+            this.arguments.required = parsedArguments.required.split(' ')
         }
-        if(rawOptional) {
-            this.arguments.optional = rawOptional.split(' ')
+        if(parsedArguments.optional) {
+            this.arguments.optional = parsedArguments.optional.split(' ')
         }
-        this.arguments.gather = gather
+        this.arguments.gather = parsedArguments.gather
     }
 }
 

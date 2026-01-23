@@ -121,11 +121,11 @@ export class MagikSession {
         if(!editor) {
             return 
         }
-    
+
         const text = editor.document.getText(range)
         const tempFilePath = path.join(os.tmpdir(), 'sessionBuffer.magik')
         fs.writeFileSync(tempFilePath, text, { encoding: 'utf8' })
-        await this.send(`load_file("${tempFilePath}")`)
+        await this.send(`load_file("${tempFilePath}", _unset, "${editor.document.uri.path}")`)
     }
 
     async removeExemplar(exemplarName: string) {
@@ -134,7 +134,7 @@ export class MagikSession {
 
     async showClassBrowser() {
         if(!this.classBrowser) {
-            await this.send('method_finder.start_acp()')
+            await this.send('method_finder.lazy_start?')
             const processID = await this.send('system.process_id')
             if(Number(processID) === 0) {
                 vscode.window.showErrorMessage('Unable to start class browser, please try again.')

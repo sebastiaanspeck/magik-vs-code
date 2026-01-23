@@ -225,8 +225,23 @@
   
       methodElement.addEventListener('click', () => {
         console.log(result)
-        // handleMethodClicked(result.className, result.methodName, result.package);
+        gotoDefinition(result.class, result.method, result.package);
       });
+    })
+  }
+
+  /**
+   * Notify the class browser to jump to the definition of method
+   * @param {string} className 
+   * @param {string} methodName 
+   * @param {string} packageName 
+   */
+  function gotoDefinition(className, methodName, packageName) {
+    vscode.postMessage({
+      type: 'goto',
+      class: className,
+      method: methodName,
+      package: packageName
     })
   }
 
@@ -263,9 +278,19 @@
    * @param {string[]} comments 
    */
   function addComments(comments) {
-    comments.filter(comment => comment.type === 'parameter').forEach(addParameterComment)
-    comments.filter(comment => comment.type === 'return').forEach(addReturnComment)
-    comments.filter(comment => comment.type === 'text').forEach(addTextComment)
+    comments.forEach(comment => {
+      switch(comment.type) {
+        case 'text':
+          addTextComment(comment)
+          break
+        case 'parameter':
+          addParameterComment(comment)
+          break
+        case 'return': 
+          addReturnComment(comment)
+          break
+        }
+    })
   }
 
   /**

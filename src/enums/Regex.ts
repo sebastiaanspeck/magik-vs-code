@@ -15,13 +15,14 @@ export class Regex {
 	public static readonly DefineSharedVariable = /^[\w?]+.define_shared_variable\(:[\w?]+,/
 	public static readonly Constant = /^(_global\s*)?_constant/
 	public static readonly ClassBrowser = {
-		Topic: /^\x14.*/,
-		Method: /^([\w?!(),<^\[\]]+) *IN *([\w?!]+)?:?(<?[\w?!]+>?) *(A|B|Restr)? ?(S)? ?(Redef)? ?(Depr|Debug)? ?(iter)? ?(private)? ?(classvar|classconst)? ?(.+)?/,
+		Topic: /^\x14(?<topic>.*)/,
+		Method: /^(?<method>[\w?!(),<^\[\]]+) *IN *(?<package>[\w?!]+)?:?(?<class><?[\w?!]+>?) *(?<level1>A|B|Restr)? ?(?<subclassable>S)? ?(?<redefinable>Redef)? ?(?<level2>Depr|Debug)? ?(?<iterator>iter)? ?(?<private>private)? ?(?<type>classvar|classconst)? ?(?<topics>.+)?/,
 		Comment: /\s*##.*/,
-		ParameterComment: /^@param +{*(.*)?} +([\w?!]*) *([^\s].*)?/,
-		ReturnComment: /^@return +{*(.*)?} *([^\s].*)?/,
+		ParameterComment: /^@param +{*(?<class>.*)?} +(?<parameter>[\w?!]*) *(?<description>[^\s].*)?/,
+		ReturnComment: /^@return +{*(?<class>.*)?} *(?<description>[^\s].*)?/,
 		Total: /^>?\d+$/,
 		Info: /\s*\*\*\* .*/,
-		Arguments: /^(.*?)(?:\s*OPT\s*(.*?))?(?:\s*GATH\s*(.*?))?$/,
+		Arguments: /^(?<required>.*?)(?:\s*OPT\s*(?<optional>.*?))?(?:\s*GATH\s*(?<gather>.*?))?$/,
+		MethodResource: /^(?<path>[\w:$\/\\.]*.magik) (?<method>[\w?!(),<^\[\]]+) (?<package>[\w?!]+)?:?(?<class><?[\w?!]+>?)/
 	} as const
 }

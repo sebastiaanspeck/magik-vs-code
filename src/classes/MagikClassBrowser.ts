@@ -9,7 +9,7 @@ import { MagikClassBrowserMethod } from './MagikClassBrowserMethod'
 
 export class MagikClassBrowser implements vscode.WebviewViewProvider {
     processID: number
-    process?: ChildProcessWithoutNullStreams
+    private process?: ChildProcessWithoutNullStreams
     context: vscode.ExtensionContext
     view?: vscode.WebviewView
     searchParameters = {
@@ -62,46 +62,72 @@ export class MagikClassBrowser implements vscode.WebviewViewProvider {
         })
     }
 
+    private sendToProcess(line: string) {
+        this.process!.stdin.write(line + '\n')
+    }
+
     processLine(line: string) {
         // Remove ASCII escape ENQ char
         line = line.replace('\x05', '')
 
-        if(Regex.ClassBrowser.Method.test(line)) {
-            const method = new MagikClassBrowserMethod(line)
-            this.methodBuffer.push(method)
-            return 
-        }    
-
-        if(Regex.ClassBrowser.Comment.test(line)) {
-            this.methodBuffer.at(-1)?.appendComment(line)
-            return 
-        }    
-        
-        if(Regex.ClassBrowser.Total.test(line)) {
-            this.view?.webview.postMessage({
-                type: 'results',
-                results: this.methodBuffer,
-                total: line
-            })
-            return
-        }
-        
-        if(Regex.ClassBrowser.Info.test(line)) {
-            this.view?.webview.postMessage({
-                type: 'clear'
-            })
-            this.methodBuffer = []
-            return
-        }
-        
-        if(Regex.ClassBrowser.Topic.test(line)) {
+        if(line.startsWith('\x06')) {
+            this.processMethodSourceFile(line.replace('\x06', ''))
             return
         }
 
-        // If none of the above and not empty, must be args
-        if(line.trim()) {
-            this.methodBuffer.at(-1)?.setArguments(line)
+        switch(true) {
+            case Regex.ClassBrowser.Method.test(line):
+                const method = new MagikClassBrowserMethod(line)
+                this.methodBuffer.push(method)
+                break 
+            case Regex.ClassBrowser.Comment.test(line):
+                this.methodBuffer.at(-1)?.appendComment(line, this.searchParameters.args)
+                break 
+            case Regex.ClassBrowser.Total.test(line):
+                this.view?.webview.postMessage({
+                    type: 'results',
+                    results: this.methodBuffer,
+                    total: line
+                })
+                break 
+            case Regex.ClassBrowser.Info.test(line):
+                this.view?.webview.postMessage({
+                    type: 'clear'
+                })
+                this.methodBuffer = []
+                break 
+            case Regex.ClassBrowser.Topic.test(line):
+                break
+            case line.trim().length > 0: 
+                // If none of the above and not empty, must be args
+                this.methodBuffer.at(-1)?.setArguments(line)
+                break            
+
         }
+    }
+
+    processMethodSourceFile(line: string) {
+        const parsedMethodResource = Regex.ClassBrowser.MethodResource.exec(line)?.groups
+        if(!parsedMethodResource) {
+            vscode.window.showErrorMessage(line)
+        }
+        const methodSourceUri = vscode.Uri.file(parsedMethodResource!.path)
+        this.showMethodSource(methodSourceUri, parsedMethodResource!.class, parsedMethodResource!.method)
+    }
+
+    private async showMethodSource(uri: vscode.Uri, className: string, methodName: string) {
+        try {
+            await vscode.workspace.fs.stat(uri)
+        }
+        catch {
+            vscode.window.showErrorMessage(`Unable to locate source file for ${className}.${methodName}`)
+            return
+        }
+
+        const document = await vscode.workspace.openTextDocument(uri)
+        const editor = await vscode.window.showTextDocument(document)
+        const text = editor.document.getText()
+        // TODO: Find method range and apply editor.revealRange
     }
 
     resolveWebviewView(webviewView: vscode.WebviewView, context: vscode.WebviewViewResolveContext, token: vscode.CancellationToken): Thenable<void> | void {
@@ -128,6 +154,10 @@ export class MagikClassBrowser implements vscode.WebviewViewProvider {
                     name = message.name as 'local' | 'args' | 'comments'
                     this.searchParameters[name] = !this.searchParameters[name]
                     break
+                case 'goto':
+                    const className = message.package ? `${message.package}:${message.class}` : message.class
+                    this.sendToProcess(`pr_source_file ${message.method} ${className}`)
+                    return
             }
             
             this.search()
@@ -159,18 +189,18 @@ export class MagikClassBrowser implements vscode.WebviewViewProvider {
             this.searchParameters.args ? 'show_args' : 'dont_show_args',
             this.searchParameters.comments ? 'show_comments' : 'dont_show_comments',
             'show_topics',
-            // 'override_flags',
             'override_topics',
             this.searchParameters.local ? 'local_only' : 'inherit_all',
+            // 'override_flags', // This overrides the search parameters below, but also shows methods without pragma/flags
             this.searchParameters.basic ? 'add basic' : 'unadd basic',
             this.searchParameters.advanced ? 'add advanced' : 'unadd advanced',
             this.searchParameters.restricted ? 'add restricted' : 'unadd restricted',
             this.searchParameters.deprecated ? 'add deprecated' : 'unadd deprecated',
             this.searchParameters.debug ? 'add debug' : 'unadd debug',
             `method_cut_off ${this.searchParameters.maxResults}`,
-            'print_curr_methods\n'
+            'print_curr_methods'
         ];
-        this.process!.stdin.write(query.join('\n'))
+        this.sendToProcess(query.join('\n'))
     }
 
     toggleWebviewInputs(enabled = true) {
