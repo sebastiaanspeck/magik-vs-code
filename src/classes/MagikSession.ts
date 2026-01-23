@@ -188,7 +188,7 @@ export class MagikSession {
             return
         }
     
-        const globalCreationMatch = trimmed.match(Regex.GlobalCreationPrompt)
+        const globalCreationMatch = trimmed.match(Regex.Session.GlobalCreationPrompt)
         if(globalCreationMatch) {
             const shouldCreateGlobal = await vscode.window.showQuickPick(['Yes', 'No'], {
                 title: globalCreationMatch[1]
@@ -197,17 +197,17 @@ export class MagikSession {
             return this.process.stdin.write(`${shouldCreateGlobal === 'Yes' ? 'y' : 'n'}\r\n`)
         }
     
-        line = line.replaceAll(Regex.Error, error => applyStyle(error, Style.White, Style.RedBackground))
+        line = line.replaceAll(Regex.Session.Error, error => applyStyle(error, Style.White, Style.RedBackground))
 
-        line = line.replaceAll(Regex.Traceback, traceback => applyStyle(traceback, Style.Red))
+        line = line.replaceAll(Regex.Session.Traceback, traceback => applyStyle(traceback, Style.Red))
         
-        line = line.replaceAll(Regex.Warning, warning => applyStyle(warning, Style.Black, Style.YellowBackground))
+        line = line.replaceAll(Regex.Session.Warning, warning => applyStyle(warning, Style.Black, Style.YellowBackground))
 
-        line = line.replaceAll(Regex.Global, global => applyStyle(global, Style.Green))
+        line = line.replaceAll(Regex.Session.Global, global => applyStyle(global, Style.Green))
     
-        line = line.replaceAll(Regex.String, string => applyStyle(string, Style.Yellow))
+        line = line.replaceAll(Regex.Session.String, string => applyStyle(string, Style.Yellow))
     
-        line = line.replaceAll(Regex.Apropos, (_, type: string, name: string, className: string) => {		
+        line = line.replaceAll(Regex.Session.Apropos, (_, type: string, name: string, className: string) => {		
             const styledName = name
                 .replace(/^[\w?!\[\]]*/g, name => applyStyle(name, Style.Yellow))
                 .replace(' optional ', applyStyle(' optional ', Style.Cyan))
@@ -216,9 +216,9 @@ export class MagikSession {
             return `${applyStyle(type, type === 'CORRUPT' ? Style.Red : Style.Blue)} ${styledName} ${applyStyle('in', Style.Grey)} ${applyStyle(className, Style.Green)}`
         })
     
-        line = line.replaceAll(Regex.TracebackPath, tracebackPath => applyStyle(tracebackPath, Style.Grey))
+        line = line.replaceAll(Regex.Session.TracebackPath, tracebackPath => applyStyle(tracebackPath, Style.Grey))
     
-        line = line.replaceAll(Regex.Todo, todo => applyStyle(todo, Style.Red))
+        line = line.replaceAll(Regex.Session.Todo, todo => applyStyle(todo, Style.Red))
     
         this.appendOutput(line, execution)
     }

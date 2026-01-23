@@ -112,22 +112,42 @@ export class MagikClassBrowser implements vscode.WebviewViewProvider {
             vscode.window.showErrorMessage(line)
         }
         const methodSourceUri = vscode.Uri.file(parsedMethodResource!.path)
-        this.showMethodSource(methodSourceUri, parsedMethodResource!.class, parsedMethodResource!.method)
+        this.showMethodSource(methodSourceUri, parsedMethodResource!.class, parsedMethodResource!.method, parsedMethodResource!.package)
     }
 
-    private async showMethodSource(uri: vscode.Uri, className: string, methodName: string) {
+    private async showMethodSource(uri: vscode.Uri, className: string, methodName: string, packageName: string) {
+        const fullMethodName = this.methodString(className, methodName, packageName)
         try {
             await vscode.workspace.fs.stat(uri)
         }
         catch {
-            vscode.window.showErrorMessage(`Unable to locate source file for ${className}.${methodName}`)
+            vscode.window.showErrorMessage(`Unable to locate source file for ${fullMethodName}`)
             return
         }
 
         const document = await vscode.workspace.openTextDocument(uri)
+        const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>('vscode.executeDocumentSymbolProvider', uri)
+        const symbol = symbols.find(symbol => symbol.name === fullMethodName)
+
+        if(!symbol) {
+            vscode.window.showWarningMessage(`Source file found, but unable to locate ${fullMethodName}`)
+            return
+        }
+
         const editor = await vscode.window.showTextDocument(document)
-        const text = editor.document.getText()
-        // TODO: Find method range and apply editor.revealRange
+        editor.revealRange(symbol.range, vscode.TextEditorRevealType.InCenter)
+    }
+
+    methodString(className: string, methodName: string, packageName: string) {
+        let methodString = `${packageName ?? 'sw'}:`
+        if(className !== '<global>') {
+            methodString += className
+            if(!methodName.startsWith('[')) {
+                methodString += '.'
+            }
+        }
+        methodString += methodName
+        return methodString
     }
 
     resolveWebviewView(webviewView: vscode.WebviewView, context: vscode.WebviewViewResolveContext, token: vscode.CancellationToken): Thenable<void> | void {

@@ -40,7 +40,7 @@ export class MagikCodeLensProvider implements vscode.CodeLensProvider {
                     })
             )
 
-            const defSlottedExemplarMatch = line.match(Regex.DefSlottedExemplar)
+            const defSlottedExemplarMatch = line.match(Regex.Code.DefSlottedExemplar)
             if(defSlottedExemplarMatch) {
                 const exemplarName = defSlottedExemplarMatch[1]
                 this.codeLenses.push(
@@ -60,11 +60,11 @@ export class MagikCodeLensProvider implements vscode.CodeLensProvider {
 
 function isSectionStart(line: string) {
     return [
-        Regex.DefSlottedExemplar,
-        Regex.DefineSlotAccess,
-        Regex.Method,
-        Regex.Constant,
-        Regex.DefineSharedConstant,
-        Regex.DefineSharedVariable
-    ].some(regex => line.match(regex))
+        Regex.Code.DefSlottedExemplar,
+        Regex.Code.DefineSlotAccess,
+        Regex.Code.Method,
+        Regex.Code.Constant,
+        Regex.Code.DefineSharedConstant,
+        Regex.Code.DefineSharedVariable
+    ].some(regex => regex.test(line))
 }
