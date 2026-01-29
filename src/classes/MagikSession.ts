@@ -8,24 +8,26 @@ import { Style } from '../enums/Style'
 import { Regex } from '../enums/Regex'
 import { getContext } from '../utils/state'
 import { MagikCodeLensProvider } from './MagikCodeLensProvider'
+import { MagikClassBrowser } from './MagikClassBrowser'
 
 export class MagikSession {
     gisVersionPath: string
     gisAliasPath: string
     gisAliasName: string
-    environmentPath: string | undefined
+    environmentPath?: string
     process!: ChildProcessWithoutNullStreams
     notebook!: vscode.NotebookDocument
-    lastExecutedCell: vscode.NotebookCell | undefined
+    lastExecutedCell?: vscode.NotebookCell
     codeLensProvider!: MagikCodeLensProvider
+    classBrowser?: MagikClassBrowser
 
     constructor(gisVersionPath: string, gisAliasPath: string, gisAliasName: string, environmentPath?: string) {
         this.gisVersionPath = gisVersionPath
         this.gisAliasPath = gisAliasPath
         this.gisAliasName = gisAliasName
         this.environmentPath = environmentPath
-        this.start()
-        this.openNotebook()
+        this.startProcess()
+        this.createNotebook()
         this.enableCommands()
     } 
 
@@ -33,7 +35,7 @@ export class MagikSession {
         return !this.process.killed
     }
 
-    private start() {
+    private startProcess() {
         const runaliasPath = `${this.gisVersionPath}\\bin\\x86\\runalias.exe`
         const runaliasArgs = ['-a', this.gisAliasPath]
         if(this.environmentPath) {
@@ -61,13 +63,19 @@ export class MagikSession {
         }
     }
 
-    private async openNotebook() {
+    private async createNotebook() {
         this.notebook = await vscode.workspace.openNotebookDocument(magikNotebookController.notebookType)
-        await vscode.window.showNotebookDocument(this.notebook)
+        await this.showNotebook()
         await vscode.commands.executeCommand('notebook.cell.execute', {
             ranges: [new vscode.NotebookRange(0, 1)],
             document: this.notebook.uri
         })
+    }
+
+    async showNotebook() {
+        await vscode.window.showNotebookDocument(this.notebook)
+        await vscode.commands.executeCommand('notebook.focusBottom')
+        await vscode.commands.executeCommand('notebook.cell.edit')
     }
 
     private enableCommands() {
@@ -79,11 +87,15 @@ export class MagikSession {
             vscode.commands.registerTextEditorCommand('magik-vs-code.sendSectionAtCurrentPositionToSession', this.sendSectionAtCurrentPosition, this),
             vscode.commands.registerCommand('magik-vs-code.sendFileToSession', this.sendSection, this),
             vscode.commands.registerCommand('magik-vs-code.removeExemplar', this.removeExemplar, this),
+            vscode.commands.registerCommand('magik-vs-code.showSession', this.showNotebook, this),
+            vscode.commands.registerCommand('magik-vs-code.showClassBrowser', this.showClassBrowser, this),
             vscode.languages.registerCodeLensProvider({
                 scheme: 'file',
                 language: 'magik'
             }, this.codeLensProvider)
         )
+        // Enables keybindings with 'magik-vs-code.sessionIsActive' when-clause
+        vscode.commands.executeCommand('setContext', 'magik-vs-code.sessionIsActive', true)
     }
 
     async sendSectionAtCurrentPosition(editor: vscode.TextEditor) {
@@ -109,18 +121,31 @@ export class MagikSession {
         if(!editor) {
             return 
         }
-    
+
         const text = editor.document.getText(range)
         const tempFilePath = path.join(os.tmpdir(), 'sessionBuffer.magik')
         fs.writeFileSync(tempFilePath, text, { encoding: 'utf8' })
-        await this.send(`load_file("${tempFilePath}")`)
+        await this.send(`load_file("${tempFilePath}", _unset, "${editor.document.uri.path}")`)
     }
 
     async removeExemplar(exemplarName: string) {
         await this.send(`remex(${exemplarName})`)
     }
 
-    async send(text: string, cell?: vscode.NotebookCell): Promise<void> {
+    async showClassBrowser() {
+        if(!this.classBrowser) {
+            await this.send('method_finder.lazy_start?')
+            const processID = await this.send('system.process_id')
+            if(Number(processID) === 0) {
+                vscode.window.showErrorMessage('Unable to start class browser, please try again.')
+                return
+            }
+            this.classBrowser = new MagikClassBrowser(Number(processID))
+        }
+        this.classBrowser.show()
+    }
+
+    async send(text: string, cell?: vscode.NotebookCell): Promise<string> {
         return new Promise((resolve, reject) => {
             if(!this.isActive()) {
                 vscode.window.showErrorMessage('Session no longer active.')
@@ -132,8 +157,9 @@ export class MagikSession {
             execution.start(Date.now())
 
             this.process.stdin.write(`${text}\r`)
-
+            
             const onSessionOutput = async(chunk: Buffer) => {
+                let previousLine = ''
                 const lines = chunk.toString().split('\r\n')
                 lines.forEach(async line => {
                     await this.processLine(line, execution)
@@ -142,7 +168,11 @@ export class MagikSession {
                         this.appendOutput('\n', execution)
                         this.process.stdout.off('data', onSessionOutput)
                         execution.end(true, Date.now())
-                        resolve()
+                        resolve(previousLine)
+                    }
+
+                    if(line.trim() !== '') {
+                        previousLine = line
                     }
                 });
             }
@@ -158,7 +188,7 @@ export class MagikSession {
             return
         }
     
-        const globalCreationMatch = trimmed.match(Regex.GlobalCreationPrompt)
+        const globalCreationMatch = trimmed.match(Regex.Session.GlobalCreationPrompt)
         if(globalCreationMatch) {
             const shouldCreateGlobal = await vscode.window.showQuickPick(['Yes', 'No'], {
                 title: globalCreationMatch[1]
@@ -167,17 +197,17 @@ export class MagikSession {
             return this.process.stdin.write(`${shouldCreateGlobal === 'Yes' ? 'y' : 'n'}\r\n`)
         }
     
-        line = line.replaceAll(Regex.Error, error => applyStyle(error, Style.White, Style.RedBackground))
+        line = line.replaceAll(Regex.Session.Error, error => applyStyle(error, Style.White, Style.RedBackground))
 
-        line = line.replaceAll(Regex.Traceback, traceback => applyStyle(traceback, Style.Red))
+        line = line.replaceAll(Regex.Session.Traceback, traceback => applyStyle(traceback, Style.Red))
         
-        line = line.replaceAll(Regex.Warning, warning => applyStyle(warning, Style.Black, Style.YellowBackground))
+        line = line.replaceAll(Regex.Session.Warning, warning => applyStyle(warning, Style.Black, Style.YellowBackground))
 
-        line = line.replaceAll(Regex.Global, global => applyStyle(global, Style.Green))
+        line = line.replaceAll(Regex.Session.Global, global => applyStyle(global, Style.Green))
     
-        line = line.replaceAll(Regex.String, string => applyStyle(string, Style.Yellow))
+        line = line.replaceAll(Regex.Session.String, string => applyStyle(string, Style.Yellow))
     
-        line = line.replaceAll(Regex.Apropos, (_, type: string, name: string, className: string) => {		
+        line = line.replaceAll(Regex.Session.Apropos, (_, type: string, name: string, className: string) => {		
             const styledName = name
                 .replace(/^[\w?!\[\]]*/g, name => applyStyle(name, Style.Yellow))
                 .replace(' optional ', applyStyle(' optional ', Style.Cyan))
@@ -186,9 +216,9 @@ export class MagikSession {
             return `${applyStyle(type, type === 'CORRUPT' ? Style.Red : Style.Blue)} ${styledName} ${applyStyle('in', Style.Grey)} ${applyStyle(className, Style.Green)}`
         })
     
-        line = line.replaceAll(Regex.TracebackPath, tracebackPath => applyStyle(tracebackPath, Style.Grey))
+        line = line.replaceAll(Regex.Session.TracebackPath, tracebackPath => applyStyle(tracebackPath, Style.Grey))
     
-        line = line.replaceAll(Regex.Todo, todo => applyStyle(todo, Style.Red))
+        line = line.replaceAll(Regex.Session.Todo, todo => applyStyle(todo, Style.Red))
     
         this.appendOutput(line, execution)
     }

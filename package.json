@@ -14,7 +14,9 @@
     "languages": [
       {
         "id": "magik",
-        "extensions": [".magik"],
+        "extensions": [
+          ".magik"
+        ],
         "configuration": "./magik-language-configuration.json"
       }
     ],
@@ -29,6 +31,15 @@
         ]
       }
     ],
+    "views": {
+      "explorer": [
+        {
+          "type": "webview",
+          "id": "magik-vs-code.classBrowser",
+          "name": "Magik Class Browser"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "magik-vs-code.startSession",
@@ -37,6 +48,10 @@
       {
         "command": "magik-vs-code.killSession",
         "title": "Magik: Kill Session"
+      },
+      {
+        "command": "magik-vs-code.showSession",
+        "title": "Magik: Show Session"
       },
       {
         "command": "magik-vs-code.selectLayeredProduct",
@@ -58,23 +73,61 @@
       {
         "command": "magik-vs-code.sendFileToSession",
         "title": "Magik: Send File to Session"
+      },
+      {
+        "command": "magik-vs-code.showClassBrowser",
+        "title": "Magik: Show Class Browser"
+      },
+      {
+        "command": "magik-vs-code.searchClassBrowser",
+        "title": "Magik: Search in Class Browser"
       }
     ],
     "keybindings": [
       {
+        "command": "magik-vs-code.showSession",
+        "key": "f2 z",
+        "when": "magik-vs-code.sessionIsActive"
+      },
+      {
         "command": "magik-vs-code.sendSectionAtCurrentPositionToSession",
         "key": "f2 enter",
-        "when": "resourceLangId == magik"
+        "when": "magik-vs-code.sessionIsActive && resourceLangId == magik"
       },
       {
         "command": "magik-vs-code.sendFileToSession",
         "key": "f2 b",
-        "when": "resourceLangId == magik"
+        "when": "magik-vs-code.sessionIsActive && resourceLangId == magik"
+      },
+      {
+        "key": "f2 p",
+        "command": "notebook.focusPreviousEditor",
+        "when": "magik-vs-code.sessionIsActive && config.notebook.navigation.allowNavigateToSurroundingCells && editorTextFocus && inputFocus && notebookEditorFocused && !accessibilityModeEnabled && !isEmbeddedDiffEditor"
+      },
+      {
+        "key": "alt+p",
+        "command": "notebook.focusPreviousEditor",
+        "when": "magik-vs-code.sessionIsActive && config.notebook.navigation.allowNavigateToSurroundingCells && editorTextFocus && inputFocus && notebookEditorFocused && !accessibilityModeEnabled && !isEmbeddedDiffEditor"
+      },
+      {
+        "key": "f2 n",
+        "command": "notebook.focusNextEditor",
+        "when": "magik-vs-code.sessionIsActive && config.notebook.navigation.allowNavigateToSurroundingCells && editorTextFocus && inputFocus && notebookEditorFocused && !accessibilityModeEnabled && !isEmbeddedDiffEditor"
+      },
+      {
+        "key": "alt+n",
+        "command": "notebook.focusNextEditor",
+        "when": "magik-vs-code.sessionIsActive && config.notebook.navigation.allowNavigateToSurroundingCells && editorTextFocus && inputFocus && notebookEditorFocused && !accessibilityModeEnabled && !isEmbeddedDiffEditor"
       },
       {
         "key": "f8",
         "command": "notebook.cell.execute",
-        "when": "notebookCellListFocused && notebookMissingKernelExtension && !notebookCellExecuting && notebookCellType == 'code' && notebookType == magik-notebook || notebookCellListFocused && !notebookCellExecuting && notebookCellType == 'code' && notebookKernelCount > 0 && notebookType == magik-notebook || notebookCellListFocused && !notebookCellExecuting && notebookCellType == 'code' && notebookKernelSourceCount > 0 && notebookType == magik-notebook"
+        "when": "magik-vs-code.sessionIsActive && notebookCellListFocused && notebookMissingKernelExtension && !notebookCellExecuting && notebookCellType == 'code' && notebookType == magik-notebook || magik-vs-code.sessionIsActive && notebookCellListFocused && !notebookCellExecuting && notebookCellType == 'code' && notebookKernelCount > 0 && notebookType == magik-notebook || magik-vs-code.sessionIsActive && notebookCellListFocused && !notebookCellExecuting && notebookCellType == 'code' && notebookKernelSourceCount > 0 && notebookType == magik-notebook"
+      },
+      {
+        "key": "f3 f3",
+        "command": "magik-vs-code.showClassBrowser",
+        "when": "magik-vs-code.sessionIsActive"
       }
     ],
     "configuration": {
@@ -107,6 +160,13 @@
           },
           "default": [],
           "description": "A collection of GIS versions which can be used to start a session."
+        },
+        "magik-vs-code.classBrowserMaxResults": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 20000,
+          "default": 200,
+          "description": "Max amount of search results form the Magik class browser."
         }
       }
     }
@@ -135,5 +195,8 @@
     "typescript": "^5.9.2",
     "webpack": "^5.101.0",
     "webpack-cli": "^6.0.1"
+  },
+  "dependencies": {
+    "@vscode/codicons": "^0.0.44"
   }
 }

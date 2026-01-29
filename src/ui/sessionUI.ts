@@ -10,7 +10,7 @@ import { GisAlias } from '../interfaces/GisAlias'
 import { config, setMagikSession } from '../extension'
 
 export function showGisVersionPicker() {
-	const gisVersions = config.get<GisVersion[]>('gisVersions') ?? []
+	const gisVersions = config.get<GisVersion[]>('gisVersions')!
 	
 	if(gisVersions.length === 0) {
 		vscode.window.showWarningMessage('No GIS versions found', 'Open Settings').then(selection => {
