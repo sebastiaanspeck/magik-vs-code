@@ -35,22 +35,37 @@
     })
   })
 
-  document.onkeydown = (e) => {
-    const activeElement = document.activeElement;
-    switch (e.key) {
+  document.onkeydown = (event) => {
+    const activeElement = document.activeElement
+
+    switch (event.key) {
       case 'Tab': 
         (activeElement === classInput ? methodInput : classInput).focus()
-        e.preventDefault()
+        event.preventDefault()
         break
       case '/':
+        event.preventDefault()
         if (activeElement === classInput || activeElement === methodInput) {
           vscode.postMessage({
             type: 'textfield',
             name: activeElement.name,
             value: ''
           })
-          e.preventDefault()
         }
+        break
+      case 'Enter':
+        event.preventDefault()
+        if(activeElement.className === 'method-element') {
+          activeElement.click()
+        }
+        break
+      case 'ArrowDown':
+        event.preventDefault()
+        focusNextMethod()
+        break
+      case 'ArrowUp':
+        event.preventDefault()
+        focusPreviousMethod()
         break
     }
   };
@@ -176,10 +191,11 @@
   function updateResultList(results, resultsLength) {
     resultsCounter.textContent = `${resultsLength} results found`;
 
-    results.forEach(result => {
+    results.forEach((result, index) => {
       const methodElement = document.createElement('li');
       methodElement.className = 'method-element';
-      methodElement.setAttribute('tabindex', 0);
+      methodElement.setAttribute('tabindex', -1);
+      methodElement.setAttribute('index', index);
       methodElement.setAttribute('data-class-name', result.class);
       methodElement.setAttribute('data-method-name', result.method);
       methodElement.setAttribute('data-package-name', result.package);
@@ -192,16 +208,31 @@
   
       if(result.package) {
         addText(methodElement, result.package);
-        addText(methodElement, '\u2004:\u2004');
+        addText(methodElement, ':');
       }
 
       addText(methodElement, result.class, 'class-entry');
-      addText(methodElement, '\u2004.\u2004');
-      if(result.method.endsWith('()')) {
-        addArguments(methodElement, result)
+
+      if(result.class === '<global>') {
+        addText(methodElement, '\u2004');
+      }
+      else if (!result.method.startsWith('[')) {
+        addText(methodElement, '.');
+      }
+
+      const isAssignmentMethod = result.method.endsWith('<<')
+      const methodBracketsMatch = result.method.match(/(?<before>.*(\(|\[)).*(?<after>(\)|\]).*)/)
+      if(methodBracketsMatch) {
+        addText(methodElement, methodBracketsMatch.groups.before, 'method-entry')
+        addArguments(methodElement, result.arguments, isAssignmentMethod)
+        addText(methodElement, methodBracketsMatch.groups.after, 'method-entry')
       }
       else {
         addText(methodElement, result.method, 'method-entry');
+      }
+
+      if(isAssignmentMethod) {
+        addText(methodElement, '\u2004' + (result.arguments.required[0] ?? result.arguments.optional[0] ?? ''))
       }
 
       [
@@ -212,7 +243,7 @@
       ].forEach(modifier => {
         if(result[modifier.name]) {
           addText(methodElement, '\u2004\u2004');
-          addIcon(methodElement, modifier.icon, 'modifier', modifier.name)
+          addIcon(methodElement, modifier.icon, 'modifier', capitalizeFirstLetter(modifier.name))
         }
       })
 
@@ -223,8 +254,8 @@
       }
   
       methodElement.addEventListener('click', () => {
-        console.log(result)
-        gotoDefinition(result.class, result.method, result.package);
+        console.log(result.raw)
+        gotoDefinition(result.class, result.method, result.package)
       });
     })
   }
@@ -247,29 +278,33 @@
   /**
    * Append style method arguments to an element
    * @param {HTMLElement} element 
-   * @param {object} result 
+   * @param {object} args 
    */
-  function addArguments(element, result) {
-    addText(element, result.method.slice(0, -1) + '\u2004', 'method-entry')
+  function addArguments(element, args, hideFirstArg) {
     
-    const requiredArgs = result.arguments.required
+    const requiredArgs = args.required.slice(hideFirstArg ? 1 : 0)
     if(requiredArgs.length) {
-      addText(element, `${requiredArgs.join(', ')}\u2004`)
+      addText(element, `${requiredArgs.join(', ')}`)
     }
 
-    const optionalArgs = result.arguments.optional
+    const optionalArgs = args.optional
     if(optionalArgs.length) {
+      if(requiredArgs.length) {
+        addText(element, '\u2004')
+      }
       addText(element, 'OPTIONAL', 'optional-gather')
-      addText(element, `\u2004${optionalArgs.join(', ')}\u2004`)
+      addText(element, `\u2004${optionalArgs.join(', ')}`)
     }
 
-    const gatherArg = result.arguments.gather
+    const gatherArg = args.gather
     if(gatherArg) {
+      if(optionalArgs.length || requiredArgs.length) {
+        addText(element, '\u2004')
+      }
       addText(element, 'GATHER', 'optional-gather')
-      addText(element, `\u2004${gatherArg}\u2004`)
+      addText(element, `\u2004${gatherArg}`)
     }
 
-    addText(element, ')', 'method-entry')
   }
 
   /**
@@ -319,8 +354,8 @@
     commentElement.className = 'comment-element'
 
     addIcon(commentElement, 'symbol-field', 'modifier', 'parameter')
-    addText(commentElement, `\u2004${parameterComment.parameter}`)
-    addText(commentElement, `\u2004${parameterComment.class}`, 'class-entry')
+    addText(commentElement, `\u2004${parameterComment.parameter}`, 'code')
+    addText(commentElement, `\u2004${parameterComment.class}`, 'class-entry code')
     addText(commentElement, `\u2004${parameterComment.description}`, 'comment-text')
 
     commentsElement.appendChild(commentElement)
@@ -338,11 +373,53 @@
     commentElement.className = 'comment-element'
 
     addIcon(commentElement, 'newline', 'modifier', 'return')
-    addText(commentElement, `\u2004${returnComment.class}`, 'class-entry')
+    addText(commentElement, `\u2004${returnComment.class}`, 'class-entry code')
     addText(commentElement, `\u2004${returnComment.description}`, 'comment-text')
     
     commentsElement.appendChild(commentElement)
     resultsList.appendChild(commentsElement)
+  }
+
+  /**
+   * Focuses the next method in the method search results (if any are available)
+   * Jumps to the top once the bottom element has been reached 
+   */
+  function focusNextMethod() {
+    const activeElement = document.activeElement
+    const methodElements = document.querySelectorAll('li.method-element')
+    const activeIndex = Number(activeElement.getAttribute('index'))
+
+    if(methodElements.length === 0) {
+      return
+    }
+
+    if(activeElement.className !== 'method-element' || activeIndex + 1 >= methodElements.length) {
+      methodElements[0].focus()
+      return
+    }
+
+    methodElements[activeIndex + 1].focus()
+  }
+
+  /**
+   * Focuses the previous method in the method search results (if any are available)
+   * Jumps to the bottom once the top element has been reached
+   */
+  function focusPreviousMethod() {
+    const activeElement = document.activeElement
+    const methodElements = document.querySelectorAll('li.method-element')
+    const activeIndex = Number(activeElement.getAttribute('index'))
+
+    if(methodElements.length === 0) {
+      return 
+    }
+
+    if(activeElement.className !== 'method-element' || activeIndex <= 0) {
+      methodElements[methodElements.length - 1].focus()
+      return
+    }
+
+    methodElements[activeIndex - 1].focus()
   }
 
   /**

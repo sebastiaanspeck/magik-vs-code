@@ -106,7 +106,7 @@ export class MagikClassBrowser implements vscode.WebviewViewProvider {
         }
     }
 
-    processMethodSourceFile(line: string) {
+    private processMethodSourceFile(line: string) {
         const parsedMethodResource = Regex.ClassBrowser.MethodResource.exec(line)?.groups
         if(!parsedMethodResource) {
             vscode.window.showErrorMessage(line)

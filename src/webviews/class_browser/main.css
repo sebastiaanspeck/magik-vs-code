@@ -72,6 +72,13 @@ body {
 	cursor: pointer;
 	background-color: var(--vscode-list-hoverBackground);
 	outline: 1px solid transparent;
+	font-family: var(--vscode-editor-font-family);
+	font-size: var(--vscode-editor-font-size);
+}
+
+.code {
+	font-family: var(--vscode-editor-font-family);
+	font-size: var(--vscode-editor-font-size);
 }
 
 .method-element:first-child {
