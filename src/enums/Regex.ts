@@ -10,14 +10,6 @@ export class Regex {
 		Traceback: /^---- traceback.*/gi,
 		TracebackPath: /\(\s*[^()]+\s*:\s*\d+\s*\)/g
 	} as const
-	public static readonly Code = {
-		Method: /^(_private\s*)?_method\s*[\w?]+\..*/,
-		DefSlottedExemplar: /^def_slotted_exemplar\((:[\w?]+),/,
-		DefineSlotAccess: /[\w?]+.define_slot_access\(:[\w?]+,\s*:(readable|read|writable|write)(,\s*(:public|:private|:read_only|_true|_false))?(,\s*:[\w?]+)?\)/,
-		DefineSharedConstant: /^[\w?]+.define_shared_constant\(:[\w?]+,/,
-		DefineSharedVariable: /^[\w?]+.define_shared_variable\(:[\w?]+,/,
-		Constant: /^(_global\s*)?_constant/
-	} as const
 	public static readonly ClassBrowser = {
 		Topic: /^\x14(?<topic>.*)/,
 		Method: /^(?<method>[\w?!(),<^\[\]]+) *IN *(?<package>[\w?!]+)?:?(?<class><?[\w?!]+>?) *(?<level1>A|B|Restr)? ?(?<subclassable>S)? ?(?<redefinable>Redef)? ?(?<level2>Depr|Debug)? ?(?<iterator>iter)? ?(?<private>private)? ?(?<type>classvar|classconst)? ?(?<topics>.+)?/,
