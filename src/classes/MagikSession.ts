@@ -9,6 +9,9 @@ import { Regex } from '../enums/Regex'
 import { getContext } from '../utils/state'
 import { MagikCodeLensProvider } from './MagikCodeLensProvider'
 import { MagikClassBrowser } from './MagikClassBrowser'
+import { createInterface, Interface } from 'readline'
+import { EventEmitter } from 'stream'
+import { once } from 'events'
 
 export class MagikSession {
     gisVersionPath: string
@@ -18,14 +21,20 @@ export class MagikSession {
     process!: ChildProcessWithoutNullStreams
     notebook!: vscode.NotebookDocument
     lastExecutedCell?: vscode.NotebookCell
+    cellExecution?: vscode.NotebookCellExecution
     codeLensProvider!: MagikCodeLensProvider
     classBrowser?: MagikClassBrowser
+    lineReader!: Interface
+    eventEmitter: EventEmitter
+    currentOutput: string[]
 
     constructor(gisVersionPath: string, gisAliasPath: string, gisAliasName: string, environmentPath?: string) {
         this.gisVersionPath = gisVersionPath
         this.gisAliasPath = gisAliasPath
         this.gisAliasName = gisAliasName
         this.environmentPath = environmentPath
+        this.eventEmitter = new EventEmitter()
+        this.currentOutput = []
         this.startProcess()
         this.createNotebook()
         this.enableCommands()
@@ -47,7 +56,32 @@ export class MagikSession {
         this.process = spawn(startSessionCommand, {
             shell: true
         })
+
+        this.lineReader = createInterface({
+            input: this.process.stdout,
+            crlfDelay: Infinity
+        })
+
+        this.lineReader.on('line', line => {
+            const lineWithoutPrompt = line.startsWith('Magik>') ? line.replace('Magik>', '').trimStart() : line
+            this.currentOutput.push(lineWithoutPrompt)
+            this.processLine(lineWithoutPrompt)
+        })
+
+        this.process.stdout.on('data', (chunk: Buffer) => {
+            const lines = chunk.toString().split('\r\n')
+            if(lines.some(line => line.startsWith('Magik>'))) {
+                this.eventEmitter.emit('magik-ready', this.currentOutput)
+                this.currentOutput = []
+                this.cellExecution?.appendOutput([
+                    new vscode.NotebookCellOutput([vscode.NotebookCellOutputItem.stdout('\n')])
+                ])
+                this.cellExecution?.end(true, Date.now())
+            }
+        })
     }
+
+    
 
     async kill() {
         if(!this.isActive()) {
@@ -135,8 +169,9 @@ export class MagikSession {
     async showClassBrowser() {
         if(!this.classBrowser) {
             await this.send('method_finder.lazy_start?')
-            const processID = await this.send('system.process_id')
-            if(Number(processID) === 0) {
+            const lastOutput = await this.send('system.process_id')
+            const processID = Number(lastOutput[0])
+            if(isNaN(processID) || processID === 0) {
                 vscode.window.showErrorMessage('Unable to start class browser, please try again.')
                 return
             }
@@ -145,48 +180,38 @@ export class MagikSession {
         this.classBrowser.show()
     }
 
-    async send(text: string, cell?: vscode.NotebookCell): Promise<string> {
-        return new Promise((resolve, reject) => {
-            if(!this.isActive()) {
-                vscode.window.showErrorMessage('Session no longer active.')
-                return reject()
-            }
+    async send(text: string, cell?: vscode.NotebookCell): Promise<string[]> {
+        if(!this.isActive()) {
+            vscode.window.showErrorMessage('Session no longer active.')
+            return Promise.reject()
+        }
 
-            this.lastExecutedCell = cell ?? this.lastExecutedCell!
-            const execution = magikNotebookController.createNotebookCellExecution(this.lastExecutedCell)
-            execution.start(Date.now())
+        // const onSessionOutput = async(chunk: Buffer) => {
+        //     const lines = chunk.toString().split('\r\n')
+        //     if(lines.some(line => line.startsWith('Magik>'))) {
+        //         this.process.stdout.off('data', onSessionOutput)
+        //         this.cellExecution!.end(true, Date.now())
+        //         this.cellExecution = undefined
+        //         resolve('')
+        //     }
+        // }
+        // this.process.stdout.on('data', onSessionOutput)
 
-            this.process.stdin.write(`${text}\r`)
-            
-            const onSessionOutput = async(chunk: Buffer) => {
-                let previousLine = ''
-                const lines = chunk.toString().split('\r\n')
-                lines.forEach(async line => {
-                    await this.processLine(line, execution)
-        
-                    if(line.startsWith('Magik>')) {
-                        this.appendOutput('\n', execution)
-                        this.process.stdout.off('data', onSessionOutput)
-                        execution.end(true, Date.now())
-                        resolve(previousLine)
-                    }
+        this.lastExecutedCell = cell ?? this.lastExecutedCell!
+        this.cellExecution = magikNotebookController.createNotebookCellExecution(this.lastExecutedCell)
+        this.cellExecution.start(Date.now())
+        this.process.stdin.write(text + '\r')
 
-                    if(line.trim() !== '') {
-                        previousLine = line
-                    }
-                });
-            }
-
-            this.process.stdout.on('data', onSessionOutput)
-        })
+        return once(this.eventEmitter, 'magik-ready')
     }
 
-    private async processLine(line: string, execution: vscode.NotebookCellExecution) {
+    private async processLine(line: string) {
         const trimmed = line.trim()
     
-        if(['Magik>', '.', 'True 0'].includes(trimmed) || trimmed.startsWith('Loading ')) { 
-            return
-        }
+        // if(['Magik>', '.', 'True 0'].includes(trimmed) || trimmed.startsWith('Loading ')) { 
+        //     return
+        // }
+        
     
         const globalCreationMatch = trimmed.match(Regex.Session.GlobalCreationPrompt)
         if(globalCreationMatch) {
@@ -220,11 +245,12 @@ export class MagikSession {
     
         line = line.replaceAll(Regex.Session.Todo, todo => applyStyle(todo, Style.Red))
     
-        this.appendOutput(line, execution)
+        this.appendOutput(line)
     }
 
-    private appendOutput(line: string, execution: vscode.NotebookCellExecution) {
-        execution.appendOutput([
+    private appendOutput(line: string) {
+        this.cellExecution = this.cellExecution ?? magikNotebookController.createNotebookCellExecution(this.lastExecutedCell!)
+        this.cellExecution.appendOutput([
             new vscode.NotebookCellOutput([vscode.NotebookCellOutputItem.stdout(line)])
         ])
     }
