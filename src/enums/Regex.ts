@@ -4,7 +4,7 @@ export class Regex {
 		Error: /^\*\*\*\* error.*/gi,
 		Warning: /^\*\*\*\* warning.*/gi,
 		Global: /![\w?]*?!/g,
-		GlobalCreationPrompt: /^(Global .* does not exist: create it\?) \(Y\)$/,
+		GlobalCreationPrompt: /(Global .* does not exist: create it\?) \(Y\)/,
 		String: /\".*?\"/g,
 		Todo: /todo/gi,
 		Traceback: /^---- traceback.*/gi,

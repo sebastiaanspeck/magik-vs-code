@@ -50,17 +50,20 @@ class MagikNotebookSerializer implements vscode.NotebookSerializer {
 export const magikNotebookController = vscode.notebooks.createNotebookController('magik-notebook-kernel', 'magik-notebook', "Magik Notebook Kernel")
 magikNotebookController.executeHandler = async (cells: vscode.NotebookCell[], notebook: vscode.NotebookDocument, controller: vscode.NotebookController) => {
 	for(const cell of cells) {
-		const test = await magikSession.send(cell.document.getText(), cell)
-		console.log(test)
-		// if (cell.index === notebook.cellCount - 1) {
-		// 	const newCell = new vscode.NotebookCellData(vscode.NotebookCellKind.Code, cell.document.getText(), 'magik')
-		// 	const edit = new vscode.WorkspaceEdit()
-		// 	edit.set(notebook.uri, [
-		// 		vscode.NotebookEdit.insertCells(notebook.cellCount, [newCell])
-		// 	])
-		// 	await vscode.workspace.applyEdit(edit)
-		// 	await vscode.commands.executeCommand('notebook.focusBottom')
-		// 	await vscode.commands.executeCommand('notebook.cell.edit')
-		// }
+		await magikSession.send(cell.document.getText(), cell)
+
+		if(!config.get<Boolean>('createCellAfterExecution') || cell.index !== notebook.cellCount - 1) {
+			continue
+		}
+
+		const newCellText = config.get<Boolean>('copyContentOnCellCreation') ? cell.document.getText() : ''
+		const newCell = new vscode.NotebookCellData(vscode.NotebookCellKind.Code, newCellText, 'magik')
+		const edit = new vscode.WorkspaceEdit()
+		edit.set(notebook.uri, [
+			vscode.NotebookEdit.insertCells(notebook.cellCount, [newCell])
+		])
+		await vscode.workspace.applyEdit(edit)
+		await vscode.commands.executeCommand('notebook.focusBottom')
+		await vscode.commands.executeCommand('notebook.cell.edit')
 	}
 }
