@@ -167,6 +167,16 @@
           "maximum": 20000,
           "default": 200,
           "description": "Max amount of search results form the Magik class browser."
+        },
+        "magik-vs-code.createCellAfterExecution": {
+          "type": "boolean",
+          "default": true,
+          "description": "Create a new cell below the bottom cell after its execution is done."
+        },
+        "magik-vs-code.copyContentOnCellCreation": {
+          "type": "boolean",
+          "default": true,
+          "description": "When a new cell is created, determines if the contents of the previous cell are copied."
         }
       }
     }

@@ -6,27 +6,45 @@ import path from 'path'
 import os from 'os'
 import { Style } from '../enums/Style'
 import { Regex } from '../enums/Regex'
-import { getContext } from '../utils/state'
+import { getContext, getState } from '../utils/state'
 import { MagikCodeLensProvider } from './MagikCodeLensProvider'
 import { MagikClassBrowser } from './MagikClassBrowser'
+import { createInterface } from 'readline'
+import { EventEmitter } from 'stream'
+import { once } from 'events'
+import { GisVersion } from '../interfaces/GisVersion'
+import { LayeredProduct } from '../interfaces/LayeredProduct'
 
 export class MagikSession {
     gisVersionPath: string
     gisAliasPath: string
     gisAliasName: string
     environmentPath?: string
+
     process!: ChildProcessWithoutNullStreams
     notebook!: vscode.NotebookDocument
     lastExecutedCell?: vscode.NotebookCell
+    cellExecution?: vscode.NotebookCellExecution
+    currentOutput: string[]
+    hideNextOutput: Boolean
+
     codeLensProvider!: MagikCodeLensProvider
     classBrowser?: MagikClassBrowser
+
+    statusBarItem!: vscode.StatusBarItem
+
+    eventEmitter: EventEmitter
 
     constructor(gisVersionPath: string, gisAliasPath: string, gisAliasName: string, environmentPath?: string) {
         this.gisVersionPath = gisVersionPath
         this.gisAliasPath = gisAliasPath
         this.gisAliasName = gisAliasName
         this.environmentPath = environmentPath
+        this.eventEmitter = new EventEmitter()
+        this.currentOutput = []
+        this.hideNextOutput = false
         this.startProcess()
+        this.createStatusBarItem()
         this.createNotebook()
         this.enableCommands()
     } 
@@ -47,9 +65,52 @@ export class MagikSession {
         this.process = spawn(startSessionCommand, {
             shell: true
         })
+
+        const lineReader = createInterface({
+            input: this.process.stdout,
+            crlfDelay: Infinity
+        })
+
+        lineReader.on('line', line => {
+            const lineWithoutPrompt = line.startsWith('Magik>') ? line.replace('Magik>', '').trimStart() : line
+            this.currentOutput.push(lineWithoutPrompt)
+            if(!this.hideNextOutput) {
+                this.processLine(lineWithoutPrompt)
+            }
+        })
+
+        this.process.stdout.on('data', async (chunk: Buffer) => {
+            const lines = chunk.toString().split('\r\n')
+
+            for (const line of lines) {
+                if(line.startsWith('Magik>')) {
+                    this.eventEmitter.emit('magik-ready', this.currentOutput)
+                    this.currentOutput = []
+                    this.hideNextOutput = false
+                    this.cellExecution?.appendOutput([
+                        new vscode.NotebookCellOutput([vscode.NotebookCellOutputItem.stdout('\n')])
+                    ])
+                    this.cellExecution?.end(true, Date.now())
+                    this.cellExecution = undefined
+                    this.updateStatusBar(false)
+                    break 
+                }
+
+                const globalCreationMatch = line.match(Regex.Session.GlobalCreationPrompt)
+                if(globalCreationMatch) {
+                    const shouldCreateGlobal = await vscode.window.showQuickPick(['Yes', 'No'], {
+                        title: globalCreationMatch[1]
+                    })
+                    this.process.stdin.write(`${shouldCreateGlobal === 'Yes' ? 'y' : 'n'}\r\n`)
+                    break
+                }
+            }
+
+                    
+        })
     }
 
-    async kill() {
+    async showKillPrompt() {
         if(!this.isActive()) {
             return vscode.window.showInformationMessage('Session has already been killed.')
         }
@@ -59,17 +120,29 @@ export class MagikSession {
         })
 
         if(shouldKillProcess === 'Yes') {
-            this.process.kill()
+            this.kill()
         }
+    }
+
+    private kill() {
+        this.process.kill()
+        this.classBrowser?.toggleWebviewInputs(false)
     }
 
     private async createNotebook() {
         this.notebook = await vscode.workspace.openNotebookDocument(magikNotebookController.notebookType)
+        vscode.workspace.onDidCloseNotebookDocument(notebook => {
+            if(notebook === this.notebook && this.isActive()) {
+                this.showKillPrompt()
+            }
+        })
+
         await this.showNotebook()
         await vscode.commands.executeCommand('notebook.cell.execute', {
             ranges: [new vscode.NotebookRange(0, 1)],
             document: this.notebook.uri
         })
+
     }
 
     async showNotebook() {
@@ -82,7 +155,7 @@ export class MagikSession {
         this.codeLensProvider = new MagikCodeLensProvider()
         const context = getContext()
         context.subscriptions.push(
-            vscode.commands.registerCommand('magik-vs-code.killSession', this.kill, this),
+            vscode.commands.registerCommand('magik-vs-code.killSession', this.showKillPrompt, this),
             vscode.commands.registerCommand('magik-vs-code.sendSectionToSession', this.sendSection, this),
             vscode.commands.registerTextEditorCommand('magik-vs-code.sendSectionAtCurrentPositionToSession', this.sendSectionAtCurrentPosition, this),
             vscode.commands.registerCommand('magik-vs-code.sendFileToSession', this.sendSection, this),
@@ -96,6 +169,21 @@ export class MagikSession {
         )
         // Enables keybindings with 'magik-vs-code.sessionIsActive' when-clause
         vscode.commands.executeCommand('setContext', 'magik-vs-code.sessionIsActive', true)
+    }
+
+    private createStatusBarItem() {
+        this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, -100)
+        const gisVersion = getState<GisVersion>('GIS_VERSION')
+        const layeredProduct = getState<LayeredProduct>('LAYERED_PRODUCT')
+        this.updateStatusBar(false)
+        this.statusBarItem.tooltip = `${gisVersion?.name} | ${layeredProduct?.name} | ${this.gisAliasName}`
+        this.statusBarItem.command = 'magik-vs-code.showSession'
+        this.statusBarItem.show()
+    }
+
+    private updateStatusBar(loading: Boolean) {
+        const icon = loading ? 'sync~spin' : 'wand'
+        this.statusBarItem.text = `$(${icon}) Magik Session Active`
     }
 
     async sendSectionAtCurrentPosition(editor: vscode.TextEditor) {
@@ -134,9 +222,10 @@ export class MagikSession {
 
     async showClassBrowser() {
         if(!this.classBrowser) {
-            await this.send('method_finder.lazy_start?')
-            const processID = await this.send('system.process_id')
-            if(Number(processID) === 0) {
+            await this.send('method_finder.lazy_start?', undefined, true)
+            const lastOutput = await this.send('system.process_id', undefined, true)
+            const processID = Number(lastOutput[0])
+            if(isNaN(processID) || processID === 0) {
                 vscode.window.showErrorMessage('Unable to start class browser, please try again.')
                 return
             }
@@ -145,56 +234,29 @@ export class MagikSession {
         this.classBrowser.show()
     }
 
-    async send(text: string, cell?: vscode.NotebookCell): Promise<string> {
-        return new Promise((resolve, reject) => {
-            if(!this.isActive()) {
-                vscode.window.showErrorMessage('Session no longer active.')
-                return reject()
-            }
+    async send(text: string, cell?: vscode.NotebookCell, hideOutput = false): Promise<string[]> {
+        if(!this.isActive()) {
+            vscode.window.showErrorMessage('Session no longer active.')
+            return Promise.reject()
+        }
+        this.updateStatusBar(true)
+        this.hideNextOutput = hideOutput
 
-            this.lastExecutedCell = cell ?? this.lastExecutedCell!
-            const execution = magikNotebookController.createNotebookCellExecution(this.lastExecutedCell)
-            execution.start(Date.now())
-
-            this.process.stdin.write(`${text}\r`)
-            
-            const onSessionOutput = async(chunk: Buffer) => {
-                let previousLine = ''
-                const lines = chunk.toString().split('\r\n')
-                lines.forEach(async line => {
-                    await this.processLine(line, execution)
-        
-                    if(line.startsWith('Magik>')) {
-                        this.appendOutput('\n', execution)
-                        this.process.stdout.off('data', onSessionOutput)
-                        execution.end(true, Date.now())
-                        resolve(previousLine)
-                    }
-
-                    if(line.trim() !== '') {
-                        previousLine = line
-                    }
-                });
-            }
-
-            this.process.stdout.on('data', onSessionOutput)
+        this.lastExecutedCell = cell ?? this.lastExecutedCell!
+        this.cellExecution = magikNotebookController.createNotebookCellExecution(this.lastExecutedCell)
+        this.cellExecution.token.onCancellationRequested(() => {
+            this.process.stdin.write('$\r')
         })
+        this.cellExecution.start(Date.now())
+        this.process.stdin.write(text + '\r')
+
+        return once(this.eventEmitter, 'magik-ready')
     }
 
-    private async processLine(line: string, execution: vscode.NotebookCellExecution) {
-        const trimmed = line.trim()
-    
-        if(['Magik>', '.', 'True 0'].includes(trimmed) || trimmed.startsWith('Loading ')) { 
-            return
-        }
-    
-        const globalCreationMatch = trimmed.match(Regex.Session.GlobalCreationPrompt)
+    private async processLine(line: string) {
+        const globalCreationMatch = line.match(Regex.Session.GlobalCreationPrompt)
         if(globalCreationMatch) {
-            const shouldCreateGlobal = await vscode.window.showQuickPick(['Yes', 'No'], {
-                title: globalCreationMatch[1]
-            })
-            
-            return this.process.stdin.write(`${shouldCreateGlobal === 'Yes' ? 'y' : 'n'}\r\n`)
+            line = line.replace(globalCreationMatch[0], '').trimStart()
         }
     
         line = line.replaceAll(Regex.Session.Error, error => applyStyle(error, Style.White, Style.RedBackground))
@@ -220,13 +282,23 @@ export class MagikSession {
     
         line = line.replaceAll(Regex.Session.Todo, todo => applyStyle(todo, Style.Red))
     
-        this.appendOutput(line, execution)
+        this.appendOutput(line === '' ? ' ' : line)
     }
 
-    private appendOutput(line: string, execution: vscode.NotebookCellExecution) {
-        execution.appendOutput([
-            new vscode.NotebookCellOutput([vscode.NotebookCellOutputItem.stdout(line)])
-        ])
+    private appendOutput(line: string) {
+        if(!this.cellExecution) {
+            const tempExecution  = magikNotebookController.createNotebookCellExecution(this.lastExecutedCell!)
+            tempExecution.start()
+            tempExecution.appendOutput([
+                new vscode.NotebookCellOutput([vscode.NotebookCellOutputItem.stdout(line)])
+            ])
+            tempExecution.end(undefined)
+        }
+        else {
+            this.cellExecution.appendOutput([
+                new vscode.NotebookCellOutput([vscode.NotebookCellOutputItem.stdout(line)])
+            ])
+        }
     }
 }
 
