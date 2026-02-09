@@ -1,13 +1,25 @@
 {
   "name": "magik-vs-code",
   "displayName": "magik-vs-code",
-  "description": "",
+  "author": {
+    "name": "Party-Toast"
+  },
+  "publisher": "Party-Toast",
+  "description": "Magik language support for VS Code, including session, notebooks, and a Class Browser.",
   "version": "0.0.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Party-Toast/magik-vs-code"
+  },
   "engines": {
-    "vscode": "^1.103.0"
+    "vscode": "^1.109.0"
   },
   "categories": [
-    "Other"
+    "Programming Languages",
+    "Notebooks"
+  ],
+  "keywords": [
+    "Magik"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -190,17 +202,19 @@
     "watch-tests": "tsc -p . -w --outDir out",
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
     "lint": "eslint src",
-    "test": "vscode-test"
+    "test": "vscode-test",
+    "vsix": "vsce package"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
-    "@types/node": "22.x",
-    "@types/vscode": "^1.103.0",
-    "@typescript-eslint/eslint-plugin": "^8.39.0",
-    "@typescript-eslint/parser": "^8.39.0",
+    "@types/node": "^25.2.2",
+    "@types/vscode": "^1.109.0",
+    "@typescript-eslint/eslint-plugin": "^8.54.0",
+    "@typescript-eslint/parser": "^8.54.0",
     "@vscode/test-cli": "^0.0.11",
     "@vscode/test-electron": "^2.5.2",
-    "eslint": "^9.32.0",
+    "@vscode/vsce": "^3.7.1",
+    "eslint": "^9.39.2",
     "ts-loader": "^9.5.2",
     "typescript": "^5.9.2",
     "webpack": "^5.101.0",
