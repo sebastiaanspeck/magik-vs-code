@@ -39,7 +39,7 @@
     const activeElement = document.activeElement
 
     switch (event.key) {
-      case 'Tab': 
+      case 'Tab':
         (activeElement === classInput ? methodInput : classInput).focus()
         event.preventDefault()
         break
@@ -76,7 +76,7 @@
       case 'enable':
         enable(message.enabled);
         break;
-      case 'parameters': 
+      case 'parameters':
         updateSearchParameters(message.parameters)
         break
       case 'clear':
@@ -95,7 +95,7 @@
 
   /**
    * Enable/disable the class browser inputs
-   * @param {boolean} enabled 
+   * @param {boolean} enabled
    */
   function enable(enabled) {
     textfields.forEach(textfield => textfield.disabled = !enabled)
@@ -105,7 +105,7 @@
   /**
    * Focusses and highlights the content of a search field
    * @param {string} input Either 'method' or 'class'
-   * @returns 
+   * @returns
    */
   function focusInput(input) {
     if (classInput.classList.contains('disabled')) {
@@ -118,7 +118,7 @@
 
   /**
    * Update the current state of the class browser inputs
-   * @param {object} searchParameters 
+   * @param {object} searchParameters
    */
   function updateSearchParameters(searchParameters) {
     for(const [name, value] of Object.entries(searchParameters)) {
@@ -151,9 +151,9 @@
 
   /**
    * Append text to an element
-   * @param {HTMLElement} element 
-   * @param {string} text 
-   * @param {string?} className 
+   * @param {HTMLElement} element
+   * @param {string} text
+   * @param {string?} className
    */
   function addText(element, text, className) {
     const textElement = document.createElement('span');
@@ -166,10 +166,10 @@
 
   /**
    * Append an icon to an element
-   * @param {HTMLElement} element 
-   * @param {string} iconName 
-   * @param {string?} className 
-   * @param {string?} tooltip 
+   * @param {HTMLElement} element
+   * @param {string} iconName
+   * @param {string?} className
+   * @param {string?} tooltip
    */
   function addIcon(element, iconName, className, tooltip) {
     const iconElement = document.createElement('div')
@@ -185,8 +185,8 @@
 
   /**
    * Generate search result elements and update results counter
-   * @param {object[]} results 
-   * @param {string} resultsLength 
+   * @param {object[]} results
+   * @param {string} resultsLength
    */
   function updateResultList(results, resultsLength) {
     resultsCounter.textContent = `${resultsLength} results found`;
@@ -199,13 +199,13 @@
       methodElement.setAttribute('data-class-name', result.class);
       methodElement.setAttribute('data-method-name', result.method);
       methodElement.setAttribute('data-package-name', result.package);
-  
+
       const typeIcon = document.createElement('div')
       typeIcon.classList.add('codicon', `codicon-symbol-${result.type}`, result.level ?? 'level-unknown')
       const tooltip = result.level ? `${result.level} ${result.type}` : result.type
       typeIcon.setAttribute('title', capitalizeFirstLetter(tooltip))
       methodElement.appendChild(typeIcon);
-  
+
       if(result.package) {
         addText(methodElement, result.package);
         addText(methodElement, ':');
@@ -252,7 +252,7 @@
       if(result.comments.length) {
         addComments(result.comments)
       }
-  
+
       methodElement.addEventListener('click', () => {
         console.log(result.raw)
         gotoDefinition(result.class, result.method, result.package)
@@ -262,9 +262,9 @@
 
   /**
    * Notify the class browser to jump to the definition of method
-   * @param {string} className 
-   * @param {string} methodName 
-   * @param {string} packageName 
+   * @param {string} className
+   * @param {string} methodName
+   * @param {string} packageName
    */
   function gotoDefinition(className, methodName, packageName) {
     vscode.postMessage({
@@ -277,11 +277,11 @@
 
   /**
    * Append style method arguments to an element
-   * @param {HTMLElement} element 
-   * @param {object} args 
+   * @param {HTMLElement} element
+   * @param {object} args
    */
   function addArguments(element, args, hideFirstArg) {
-    
+
     const requiredArgs = args.required.slice(hideFirstArg ? 1 : 0)
     if(requiredArgs.length) {
       addText(element, `${requiredArgs.join(', ')}`)
@@ -309,7 +309,7 @@
 
   /**
    * Add styled method comments to the last method element
-   * @param {string[]} comments 
+   * @param {string[]} comments
    */
   function addComments(comments) {
     comments.forEach(comment => {
@@ -320,7 +320,7 @@
         case 'parameter':
           addParameterComment(comment)
           break
-        case 'return': 
+        case 'return':
           addReturnComment(comment)
           break
         }
@@ -329,7 +329,7 @@
 
   /**
    * Add styled text comment
-   * @param {object} textComment 
+   * @param {object} textComment
    */
   function addTextComment(textComment) {
     const commentsElement = document.createElement('ul')
@@ -345,7 +345,7 @@
 
   /**
    * Add styled parameter comment
-   * @param {object} parameterComment 
+   * @param {object} parameterComment
    */
   function addParameterComment(parameterComment) {
     const commentsElement = document.createElement('ul')
@@ -364,7 +364,7 @@
 
   /**
    * Add styled return value comment
-   * @param {object} returnComment 
+   * @param {object} returnComment
    */
   function addReturnComment(returnComment) {
     const commentsElement = document.createElement('ul')
@@ -375,14 +375,14 @@
     addIcon(commentElement, 'newline', 'modifier', 'return')
     addText(commentElement, `\u2004${returnComment.class}`, 'class-entry code')
     addText(commentElement, `\u2004${returnComment.description}`, 'comment-text')
-    
+
     commentsElement.appendChild(commentElement)
     resultsList.appendChild(commentsElement)
   }
 
   /**
    * Focuses the next method in the method search results (if any are available)
-   * Jumps to the top once the bottom element has been reached 
+   * Jumps to the top once the bottom element has been reached
    */
   function focusNextMethod() {
     const activeElement = document.activeElement
@@ -411,7 +411,7 @@
     const activeIndex = Number(activeElement.getAttribute('index'))
 
     if(methodElements.length === 0) {
-      return 
+      return
     }
 
     if(activeElement.className !== 'method-element' || activeIndex <= 0) {
@@ -424,9 +424,9 @@
 
   /**
    * Debounce a function call
-   * @param {function} callback 
+   * @param {function} callback
    * @param {number} wait In milliseconds
-   * @returns 
+   * @returns
    */
   function debounce(callback, wait) {
     let timeout;
@@ -439,8 +439,8 @@
 
   /**
    * Capitalize the first letter of a line
-   * @param {string} line 
-   * @returns 
+   * @param {string} line
+   * @returns
    */
   function capitalizeFirstLetter(line) {
     const firstLetter = line.charAt(0)

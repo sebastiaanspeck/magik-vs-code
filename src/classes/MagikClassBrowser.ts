@@ -32,7 +32,7 @@ export class MagikClassBrowser implements vscode.WebviewViewProvider {
         this.processID = processID
         this.searchParameters.maxResults = config.get<number>('classBrowserMaxResults')!
         this.start()
-        this.enableCommands()   
+        this.enableCommands()
     }
 
     private enableCommands() {
@@ -79,29 +79,29 @@ export class MagikClassBrowser implements vscode.WebviewViewProvider {
             case Regex.ClassBrowser.Method.test(line):
                 const method = new MagikClassBrowserMethod(line)
                 this.methodBuffer.push(method)
-                break 
+                break
             case Regex.ClassBrowser.Comment.test(line):
                 this.methodBuffer.at(-1)?.appendComment(line, this.searchParameters.args)
-                break 
+                break
             case Regex.ClassBrowser.Total.test(line):
                 this.view?.webview.postMessage({
                     type: 'results',
                     results: this.methodBuffer,
                     total: line
                 })
-                break 
+                break
             case Regex.ClassBrowser.Info.test(line):
                 this.view?.webview.postMessage({
                     type: 'clear'
                 })
                 this.methodBuffer = []
-                break 
+                break
             case Regex.ClassBrowser.Topic.test(line):
                 break
-            case line.trim().length > 0: 
+            case line.trim().length > 0:
                 // If none of the above and not empty, must be args
                 this.methodBuffer.at(-1)?.setArguments(line)
-                break            
+                break
 
         }
     }
@@ -165,11 +165,11 @@ export class MagikClassBrowser implements vscode.WebviewViewProvider {
                 case 'ready':
                     this.toggleWebviewInputs()
                     this.focus()
-                    break     
-                case 'textfield': 
+                    break
+                case 'textfield':
                     name = message.name as 'class' | 'method'
                     this.searchParameters[name] = message.value
-                    break           
+                    break
                 case 'button':
                     name = message.name as 'local' | 'args' | 'comments'
                     this.searchParameters[name] = !this.searchParameters[name]
@@ -179,7 +179,7 @@ export class MagikClassBrowser implements vscode.WebviewViewProvider {
                     this.sendToProcess(`pr_source_file ${message.method} ${className}`)
                     return
             }
-            
+
             this.search()
             this.updateWebviewSearchParameters()
         })

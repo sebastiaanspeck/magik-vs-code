@@ -24,7 +24,7 @@ export class MagikCodeLensProvider implements vscode.CodeLensProvider {
             const symbolStartIndex = symbol.range.start.line
             const linesFromSymbolReversed = lines.slice(0, symbolStartIndex).reverse()
             const distanceToPragma = linesFromSymbolReversed.slice(0, linesFromSymbolReversed.findIndex(line => line.trim() === '$')).findIndex(line => line.startsWith('_pragma'))
-            
+
             const startIndex = distanceToPragma >= 0 ? symbolStartIndex - distanceToPragma - 1 : symbolStartIndex
             const endIndex = lines.slice(symbolStartIndex).findIndex(line => line.trim() === '$') + symbolStartIndex
             const range = new vscode.Range(startIndex, 0, endIndex, 1)
