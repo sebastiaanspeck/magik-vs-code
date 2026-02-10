@@ -6,6 +6,11 @@ This is the README for magik-vs-code.
 
 TODO
 
+## Installation
+
+1. In the GitHub repository, under [_Actions_ &rarr; _Build VSIX_](https://github.com/Party-Toast/magik-vs-code/actions/workflows/ci.yaml), select the latest successful build. From the artifacts, download `magik-vsix` and unzip the file.
+2. In VS Code, under the _Extensions_ tab, click the three dots in the upper-right corner. Select _Install from VSIX..._, then select the unzipped `.vsix` file.
+
 ## Requirements
 
 TODO
