@@ -17,7 +17,7 @@ export function getContext(): vscode.ExtensionContext {
 
 export function setState(key: ValidStates, value: any) {
     getContext().workspaceState.update(key, value)
-} 
+}
 
 export function getState<T>(key: ValidStates): T | undefined {
     return getContext().workspaceState.get(key)

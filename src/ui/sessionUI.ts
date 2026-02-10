@@ -11,7 +11,7 @@ import { config, setMagikSession } from '../extension'
 
 export function showGisVersionPicker() {
 	const gisVersions = config.get<GisVersion[]>('gisVersions')!
-	
+
 	if(gisVersions.length === 0) {
 		vscode.window.showWarningMessage('No GIS versions found', 'Open Settings').then(selection => {
 			if (selection === 'Open Settings') {
@@ -20,7 +20,7 @@ export function showGisVersionPicker() {
 		})
 		return
 	}
-	
+
 	const gisVersionPicker = vscode.window.createQuickPick<GenericQuickPickItem<GisVersion>>()
 	gisVersionPicker.step = 1
 	gisVersionPicker.totalSteps = 3
@@ -30,14 +30,14 @@ export function showGisVersionPicker() {
 	gisVersionPicker.items = gisVersions.map(gisVersion => (
 		new GenericQuickPickItem(gisVersion, 'name', 'version', 'path')
 	))
-	
+
 	gisVersionPicker.onDidChangeSelection(selectedQuickPickItems => {
 		gisVersionPicker.enabled = false
 		gisVersionPicker.busy = true
-		
+
 		const gisVersion = selectedQuickPickItems[0].data
 		const runaliasPath = `${gisVersion.path}\\bin\\x86\\runalias.exe`
-		
+
 		if(!fs.existsSync(runaliasPath)) {
 			vscode.window.showErrorMessage(`${runaliasPath} not found`, 'Open Settings').then(selection => {
 				if (selection === 'Open Settings') {
@@ -45,14 +45,14 @@ export function showGisVersionPicker() {
 				}
 			})
 		}
-		
+
 		setState('GIS_VERSION', gisVersion)
 		showLayeredProductPicker()
 	})
 	gisVersionPicker.onDidHide(() => {
 		gisVersionPicker.dispose()
 	})
-	
+
 	gisVersionPicker.show()
 }
 
@@ -73,7 +73,7 @@ export async function showLayeredProductPicker() {
 		const gisAliasesPath = `${layeredProduct.path}\\config\\gis_aliases`
 		return fs.existsSync(gisAliasesPath)
 	})
-	
+
 	const layeredProductPicker = vscode.window.createQuickPick<GenericQuickPickItem<LayeredProduct>>()
 	layeredProductPicker.step = 2
 	layeredProductPicker.totalSteps = 3
@@ -82,20 +82,20 @@ export async function showLayeredProductPicker() {
 	layeredProductPicker.items = layeredProductsWithGisAliases.map(layeredProduct => (
 		new GenericQuickPickItem(layeredProduct, 'name', 'version', 'path')
 	))
-	
+
 	layeredProductPicker.onDidChangeSelection(selectedQuickPickItems => {
 		layeredProductPicker.enabled = false
 		layeredProductPicker.busy = true
-		
+
 		const layeredProduct = selectedQuickPickItems[0].data
 		setState('LAYERED_PRODUCT', layeredProduct)
 		showGisAliasPicker()
 	})
-	
+
 	layeredProductPicker.onDidHide(() => {
 		layeredProductPicker.dispose()
 	})
-	
+
 	layeredProductPicker.show()
 }
 
@@ -109,7 +109,7 @@ export function showGisAliasPicker() {
 		})
 		return
 	}
-	
+
 	const layeredProduct = getState('LAYERED_PRODUCT') as LayeredProduct | undefined
 	if(!layeredProduct) {
 		vscode.window.showErrorMessage('Unable to select a GIS alias product, please select a layered product first.', 'Select layered product').then(selection => {
@@ -121,7 +121,7 @@ export function showGisAliasPicker() {
 	}
 
 	const gisAliases = parseGisAliases(layeredProduct, gisVersion)
-	
+
 	const gisAliasPicker = vscode.window.createQuickPick<GenericQuickPickItem<GisAlias>>()
 	gisAliasPicker.step = 3
 	gisAliasPicker.totalSteps = 3
@@ -131,12 +131,12 @@ export function showGisAliasPicker() {
 	gisAliasPicker.items = gisAliases.map(gisAlias => (
 		new GenericQuickPickItem(gisAlias, 'name', 'title')
 	))
-	
+
 	gisAliasPicker.onDidChangeSelection(selectedQuickPickItems => {
 		const selectedGisAlias = selectedQuickPickItems[0].data
 		const environmentPath = `${layeredProduct.path}\\config\\environment.bat`
 		const gisAliasPath = `${layeredProduct.path}\\config\\gis_aliases`
-		
+
 		if(fs.existsSync(environmentPath)) {
 			setMagikSession(new MagikSession(gisVersion.path, gisAliasPath, selectedGisAlias.name, environmentPath))
 		}
@@ -148,6 +148,6 @@ export function showGisAliasPicker() {
 	gisAliasPicker.onDidHide(() => {
 		gisAliasPicker.dispose()
 	})
-	
+
 	gisAliasPicker.show()
 }

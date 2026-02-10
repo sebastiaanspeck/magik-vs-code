@@ -35,7 +35,7 @@ export function parseGisAliases(layeredProduct: LayeredProduct, gisVersion: GisV
 	.split('\n')
 	.filter(line => !line.trim().startsWith('#') && line.trim() !== '')
 	.join('\n')
-	
+
 	return gisAliasesRawNoCommentsNoNewlines
 	.split(/\r?\n(?=\w+:)/)
 	.map(aliasRaw => {

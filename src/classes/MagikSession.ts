@@ -47,7 +47,7 @@ export class MagikSession {
         this.createStatusBarItem()
         this.createNotebook()
         this.enableCommands()
-    } 
+    }
 
     isActive() {
         return !this.process.killed
@@ -93,7 +93,7 @@ export class MagikSession {
                     this.cellExecution?.end(true, Date.now())
                     this.cellExecution = undefined
                     this.updateStatusBar(false)
-                    break 
+                    break
                 }
 
                 const globalCreationMatch = line.match(Regex.Session.GlobalCreationPrompt)
@@ -106,7 +106,7 @@ export class MagikSession {
                 }
             }
 
-                    
+
         })
     }
 
@@ -207,7 +207,7 @@ export class MagikSession {
     async sendSection(range: vscode.Range) {
         const editor = vscode.window.activeTextEditor
         if(!editor) {
-            return 
+            return
         }
 
         const text = editor.document.getText(range)
@@ -258,30 +258,30 @@ export class MagikSession {
         if(globalCreationMatch) {
             line = line.replace(globalCreationMatch[0], '').trimStart()
         }
-    
+
         line = line.replaceAll(Regex.Session.Error, error => applyStyle(error, Style.White, Style.RedBackground))
 
         line = line.replaceAll(Regex.Session.Traceback, traceback => applyStyle(traceback, Style.Red))
-        
+
         line = line.replaceAll(Regex.Session.Warning, warning => applyStyle(warning, Style.Black, Style.YellowBackground))
 
         line = line.replaceAll(Regex.Session.Global, global => applyStyle(global, Style.Green))
-    
+
         line = line.replaceAll(Regex.Session.String, string => applyStyle(string, Style.Yellow))
-    
-        line = line.replaceAll(Regex.Session.Apropos, (_, type: string, name: string, className: string) => {		
+
+        line = line.replaceAll(Regex.Session.Apropos, (_, type: string, name: string, className: string) => {
             const styledName = name
                 .replace(/^[\w?!\[\]]*/g, name => applyStyle(name, Style.Yellow))
                 .replace(' optional ', applyStyle(' optional ', Style.Cyan))
                 .replace(' gather ', applyStyle(' gather ', Style.Cyan))
-    
+
             return `${applyStyle(type, type === 'CORRUPT' ? Style.Red : Style.Blue)} ${styledName} ${applyStyle('in', Style.Grey)} ${applyStyle(className, Style.Green)}`
         })
-    
+
         line = line.replaceAll(Regex.Session.TracebackPath, tracebackPath => applyStyle(tracebackPath, Style.Grey))
-    
+
         line = line.replaceAll(Regex.Session.Todo, todo => applyStyle(todo, Style.Red))
-    
+
         this.appendOutput(line === '' ? ' ' : line)
     }
 

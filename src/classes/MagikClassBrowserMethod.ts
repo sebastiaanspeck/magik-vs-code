@@ -61,7 +61,7 @@ export class MagikClassBrowserMethod {
 
     appendComment(rawComment: string, showArgs?: boolean) {
         const comment = rawComment.replace('##', '').trim()
-        
+
         const parsedParameterComment = Regex.ClassBrowser.ParameterComment.exec(comment)?.groups
         if(parsedParameterComment) {
             if(showArgs === false) {
@@ -73,9 +73,9 @@ export class MagikClassBrowserMethod {
                 parameter: parsedParameterComment.parameter,
                 description: parsedParameterComment.description
             })
-            return 
+            return
         }
-        
+
         const parsedReturnComment = Regex.ClassBrowser.ReturnComment.exec(comment)?.groups
         if(parsedReturnComment) {
             if(showArgs === false) {
